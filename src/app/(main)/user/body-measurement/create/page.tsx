@@ -506,7 +506,6 @@ import { useProfile } from "@/api/hooks/useProfile";
 import {
   Field,
   FieldArray,
-  Form,
   Formik,
 } from "formik";
 import React, { useEffect } from "react";
@@ -711,7 +710,7 @@ export default function SelfMeasurementForm() {
             enableReinitialize
           >
             {({ values, errors, touched, setFieldValue }) => (
-              <div className="flex flex-col h-screen md:h-full md:max-h-[90vh]">
+              <form onSubmit={(e) => { e.preventDefault(); handleSubmit(values); }} className="flex flex-col h-screen md:h-full md:max-h-[90vh]">
                 <AutoFillUserInfo values={values} setFieldValue={setFieldValue} />
 
                 {/* Modal Header */}
@@ -1028,7 +1027,7 @@ export default function SelfMeasurementForm() {
                     </button>
                   </div>
                 )}
-              </div>
+              </form>
             )}
           </Formik>
         </div>

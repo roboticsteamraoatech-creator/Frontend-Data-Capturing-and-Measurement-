@@ -213,7 +213,7 @@ const HeroSection: React.FC = () => {
         >
           <Image
             src="/Warm.png"
-            alt=""
+            alt="Decorative warm icon"
             width={100}
             height={90}
             className="object-contain"
@@ -231,7 +231,7 @@ const HeroSection: React.FC = () => {
         >
           <Image
             src="/Spiral 1.png"
-            alt=""
+            alt="Decorative spiral icon"
             width={90}
             height={90}
             className="object-contain"
@@ -498,7 +498,7 @@ const HeroSection: React.FC = () => {
           >
             <Image
               src="/Warm.png"
-              alt=""
+              alt="Decorative warm icon"
               width={50}
               height={45}
               className="object-contain"
@@ -516,7 +516,7 @@ const HeroSection: React.FC = () => {
           >
             <Image
               src="/Spiral 1.png"
-              alt=""
+              alt="Decorative spiral icon"
               width={45}
               height={45}
               className="object-contain"
