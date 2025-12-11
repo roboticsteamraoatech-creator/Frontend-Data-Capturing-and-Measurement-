@@ -1,12 +1,15 @@
-
-
 "use client"
 import { useState, useRef, useEffect } from 'react';
 import { Upload, RefreshCw, Trash2, Camera } from 'lucide-react';
 import Navbar from '@/app/components/navbar';
 import Head from 'next/head';
+import { useAuthContext } from '@/AuthContext';
+import { useRouter } from 'next/navigation';
 
 const UploadPage = () => {
+  const { token } = useAuthContext();
+  const router = useRouter();
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [frontImage, setFrontImage] = useState<string | null>(null);
   const [sideImage, setSideImage] = useState<string | null>(null);
   const [measurements, setMeasurements] = useState({
@@ -48,6 +51,14 @@ const UploadPage = () => {
   const frontInputRef = useRef<HTMLInputElement>(null);
   const sideInputRef = useRef<HTMLInputElement>(null);
 
+  // Check authentication on component mount
+  useEffect(() => {
+    // If user is not authenticated, show auth modal
+    if (!token) {
+      setShowAuthModal(true);
+    }
+  }, [token]);
+
   // Add font loading effect
   useEffect(() => {
     // Preload fonts
@@ -69,6 +80,12 @@ const UploadPage = () => {
   }, []);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'front' | 'side') => {
+    // Check if user is authenticated before allowing upload
+    if (!token) {
+      setShowAuthModal(true);
+      return;
+    }
+    
     const file = e.target.files?.[0];
     if (file) {
       const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
@@ -179,6 +196,12 @@ Legs: ${measurements.legs} cm`;
   };
 
   const triggerFileInput = (type: 'front' | 'side') => {
+    // Check if user is authenticated before allowing upload
+    if (!token) {
+      setShowAuthModal(true);
+      return;
+    }
+    
     if (type === 'front') {
       frontInputRef.current?.click();
     } else {
@@ -187,6 +210,12 @@ Legs: ${measurements.legs} cm`;
   };
 
   const triggerCamera = (type: 'front' | 'side') => {
+    // Check if user is authenticated before allowing upload
+    if (!token) {
+      setShowAuthModal(true);
+      return;
+    }
+    
     if (type === 'front') {
       if (frontInputRef.current) {
         frontInputRef.current.setAttribute('capture', 'environment');
@@ -200,6 +229,14 @@ Legs: ${measurements.legs} cm`;
     }
   };
 
+  const handleLoginRedirect = () => {
+    router.push('/auth/login');
+  };
+
+  const handleSignupRedirect = () => {
+    router.push('/auth/signup');
+  };
+
   return (
     <>
       <Head>
@@ -209,7 +246,93 @@ Legs: ${measurements.legs} cm`;
       <div className="min-h-screen bg-gray-50">
         <Navbar />
 
-        {showHeightModal && (
+        {/* Authentication Required Modal */}
+        {showAuthModal && (
+          <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(255, 255, 255, 0.7)' }}>
+            <div
+              className="bg-white rounded-[20px] shadow-lg"
+              style={{
+                width: "596px",
+                height: "330px",
+                borderRadius: "20px",
+                background: "#FFFFFF",
+                padding: "52px 60px 42px 60px",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between"
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontFamily: "Manrope",
+                    fontWeight: 600,
+                    fontSize: "22px",
+                    lineHeight: "100%",
+                    color: "#1A1A1A",
+                    marginBottom: "32px"
+                  }}
+                >
+                  Authentication Required
+                </div>
+
+                <div>
+                  <div
+                    style={{
+                      fontFamily: "Manrope",
+                      fontWeight: 400,
+                      fontSize: "16px",
+                      lineHeight: "140%",
+                      color: "#6E6E6E",
+                      marginBottom: "12px",
+                    }}
+                  >
+                    Please log in or sign up to upload images and get measurements.
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-center" style={{ gap: "20px" }}>
+                <button
+                  onClick={handleSignupRedirect}
+                  className="rounded-[20px] text-white"
+                  style={{
+                    width: "120px",
+                    height: "38px",
+                    backgroundColor: '#5D2A8B',
+                    borderRadius: "20px",
+                    fontFamily: "Manrope",
+                    fontWeight: 500,
+                    fontSize: "16px",
+                    padding: "8px 10px",
+                    cursor: 'pointer'
+                  }}
+                >
+                  Sign Up
+                </button>
+                <button
+                  onClick={handleLoginRedirect}
+                  className="rounded-[20px] text-white"
+                  style={{
+                    width: "120px",
+                    height: "38px",
+                    backgroundColor: '#5D2A8B',
+                    borderRadius: "20px",
+                    fontFamily: "Manrope",
+                    fontWeight: 500,
+                    fontSize: "16px",
+                    padding: "8px 10px",
+                    cursor: 'pointer'
+                  }}
+                >
+                  Login
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showHeightModal && token && (
           <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(255, 255, 255, 0.7)' }}>
             <div
               className="bg-white rounded-[20px] shadow-lg"
@@ -328,12 +451,12 @@ Legs: ${measurements.legs} cm`;
           </div>
         )}
 
-        <div className="py-8 px-4">
+        <div className="pt-24 pb-8 px-4">
           <div className="max-w-6xl mx-auto">
             {/* Fixed Header Section with better styling */}
-            <div className="text-center mb-8">
-              <div className="mb-6">
-                <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-3"
+            <div className="text-center mt-8">
+              <div className="mb-6 mt-4">
+                <h1 className="text-3xl md:text-4xl lg:text-2xl font-bold text-gray-900 mt-3"
                   style={{
                     fontFamily: "'Monument Extended', sans-serif",
                     fontWeight: 400,

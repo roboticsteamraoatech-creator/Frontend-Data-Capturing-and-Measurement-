@@ -203,7 +203,7 @@ const BodyMeasurementPage = () => {
                 No measurements recorded yet!
               </h3>
               <p className="manrope text-sm text-gray-500 mb-6 max-w-sm mx-auto">
-                There is nothing to view right now.<br />
+               There is nothing to view right now, <br />
                 Create a body measurement to see here.
               </p>
               <button

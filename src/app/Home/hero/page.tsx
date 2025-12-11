@@ -677,52 +677,6 @@ const HeroSection: React.FC = () => {
         </div>
         
         {/* Mobile Measurement Options - Centered at bottom */}
-        <div 
-          className="flex justify-center gap-4 mt-6"
-          style={{
-            width: "311px",
-            margin: "20px auto 0",
-          }}
-        >
-          <button
-            onClick={() => handleMeasurementChoice('yourself')}
-            style={{
-              fontFamily: "Manrope",
-              fontWeight: 400,
-              fontSize: "14px",
-              lineHeight: "100%",
-              textDecoration: "underline",
-              textDecorationStyle: "solid",
-              textUnderlineOffset: "15%",
-              color: "#1A1A1A",
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              padding: "8px 12px",
-            }}
-          >
-            Measure Yourself
-          </button>
-          <button
-            onClick={() => handleMeasurementChoice('object')}
-            style={{
-              fontFamily: "Manrope",
-              fontWeight: 400,
-              fontSize: "14px",
-              lineHeight: "100%",
-              textDecoration: "underline",
-              textDecorationStyle: "solid",
-              textUnderlineOffset: "15%",
-              color: "#1A1A1A",
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              padding: "8px 12px",
-            }}
-          >
-            Measure an Object
-          </button>
-        </div>
       </div>
     </section>
   )

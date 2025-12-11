@@ -106,3 +106,16 @@ export const useDeleteManualMeasurement = () => {
     },
   });
 };
+
+// Hook for fetching measurement types
+export const useMeasurementTypes = () => {
+  const { client } = useAuth();
+
+  return useQuery({
+    queryKey: ['measurement-types'],
+    queryFn: async () => {
+      const response = await client.get('/api/manual-measurements/options/types');
+      return response.data.data?.options || [];
+    },
+  });
+};

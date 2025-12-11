@@ -166,6 +166,7 @@ const Features = () => {
                       fontFamily: "Manrope",
                       fontWeight: 600,
                       fontSize: "18px",
+                      font: "semibold",
                       lineHeight: "100%",
                     }}
                   >
@@ -263,6 +264,8 @@ const Features = () => {
           maxWidth: "390px",
           margin: "0 auto",
           gap: "20px",
+          backgroundColor: "#F4EFFA",
+          padding: "20px",
         }}
       >
         {features.map((feature, idx) => (
@@ -270,10 +273,10 @@ const Features = () => {
             key={idx}
             className="bg-white rounded-[11.63px] flex items-start"
             style={{
-              width: "330px",
-              minHeight: "140px",
-              boxShadow: "0px 4px 16px 0px #5D2A8B1A",
-              padding: "20px",
+              width: "309px",
+              height: "140px",
+              boxShadow: "0px 2.33px 9.3px 0px #5D2A8B1A",
+              padding: "22px",
               gap: "16px",
             }}
           >
@@ -281,15 +284,15 @@ const Features = () => {
             <div
               className="flex items-center justify-center flex-shrink-0"
               style={{
-                width: "50px",
-                height: "50px",
+                width: "40px",
+                height: "40px",
               }}
             >
               <Image
                 src={feature.icon}
                 alt={feature.title}
-                width={50}
-                height={50}
+                width={40}
+                height={40}
                 style={{ objectFit: "contain" }}
               />
             </div>
@@ -297,12 +300,14 @@ const Features = () => {
             {/* Text */}
             <div style={{ flex: 1 }}>
               <h3 
-                className="text-[#1A1A1A] mb-2"
+                className="text-[#1A1A1A] mb-3"
                 style={{
                   fontFamily: "Manrope",
                   fontWeight: 600,
-                  fontSize: "14px",
-                  lineHeight: "110%",
+                  fontSize: "18px",
+                  lineHeight: "120%",
+                  letterSpacing: "0%",
+                  margin: 0,
                 }}
               >
                 {feature.title}
@@ -311,9 +316,11 @@ const Features = () => {
                 className="text-[#6E6E6EB2]"
                 style={{
                   fontFamily: "Manrope",
-                  fontWeight: 400,
-                  fontSize: "12px",
-                  lineHeight: "130%",
+                  fontWeight: 300,
+                  fontSize: "14px",
+                  lineHeight: "140%",
+                  letterSpacing: "0%",
+                  margin: 0,
                 }}
               >
                 {feature.description}

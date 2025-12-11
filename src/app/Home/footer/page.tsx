@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React from "react";
@@ -217,7 +215,7 @@ const Footer: React.FC = () => {
                         color: "#6E6E6EB2",
                       }}
                     >
-                      (+234) 809 722 7891
+                      (+234) 08097227051
                     </li>
                     <li>
                       <a
@@ -424,16 +422,18 @@ const Footer: React.FC = () => {
 
               {/* Contact container width 155, height 168; sits to the right within the 313px area */}
               <div style={{ width: 155, height: 168 }}>
-                <h4 style={{ fontFamily: "Manrope, sans-serif", fontWeight: 600, fontSize: 14, margin: 0, marginBottom: 8 }}>Contact</h4>
-                <div style={{ fontFamily: "Manrope, sans-serif", fontSize: 14, color: "rgba(110,110,110,0.7)", lineHeight: "24px" }}>
-                  <div style={{ marginBottom: 6 }}>(+234) 809 722 7891</div>
-                  <div style={{ marginBottom: 6 }}>
+                <h4 style={{ fontFamily: "Manrope, sans-serif", fontWeight: 600, fontSize: 14, margin: 0, marginBottom: 8 }}>
+                  Contact
+                </h4>
+                <div style={{ fontFamily: "Manrope, sans-serif", fontWeight: 400, fontSize: 14, color: "rgba(110,110,110,0.7)", lineHeight: "24px", letterSpacing: "0.05em" }}>
+                  <div style={{ marginBottom: 6, width: 142, height: 24 }}>+234) 809 722 7051</div>
+                  <div style={{ marginBottom: 6, width: 155, height: 24 }}>
                     <a href="mailto:DC@emailaddress.com.ng" style={{ textDecoration: "none", color: "rgba(110,110,110,0.7)" }}>Gamai@raoatech.com</a>
                   </div>
-                  <div style={{ fontSize: 12, color: "rgba(110,110,110,0.7)" }}>
+                  <div style={{ width: 146, height: 72 }}>
                     1A, Huges Avenue,<br />
-                    Alagomeji, Yaba, Lagos state.<br />
-                    Nigeria.
+                    Alagomeji, Yaba,<br />
+                    Lagos state, Nigeria.
                   </div>
                 </div>
               </div>
