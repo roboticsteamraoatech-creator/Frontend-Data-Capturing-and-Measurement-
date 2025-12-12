@@ -1,10 +1,8 @@
-
-
 "use client"
 
 import Image from "next/image";
 
-const MeasurementDesktop = () => {
+const MeasurementMobile = () => {
   return (
     <div className="relative">
       <style jsx>{`
@@ -15,64 +13,55 @@ const MeasurementDesktop = () => {
         }
         
         .measureWrap { 
-          position: relative; 
-          width: 1255px; 
-          height: 550px; 
-          margin-left: 80px; 
-          margin-top: 100px; 
+          width: 100%;
+          height: auto;
+          min-height: 671px;
+          margin: 0;
+          padding: 80px 0 0 0;
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
         }
         
         .imgBox { 
-          position: absolute; 
-          top: 0; 
-          left: 0; 
-          width: 602px; 
-          height: 550px; 
-          border-radius: 20px; 
-          overflow: hidden;
+          position: relative;
+          width: 90%;
+          max-width: 390px;
+          height: 358px;
+          border-radius: 20px;
           background-color: #FCFBFE;
+          margin: 0 auto 30px auto;
+          overflow: visible;
         }
         
         .textBox { 
-          position: absolute; 
-          top: 174px; 
-          left: 694px; 
-          width: 561px; 
-          height: 197px; 
-          gap: 30px;
+          position: relative;
+          width: 294px;
+          height: auto;
+          margin: 0 auto 30px auto;
+          gap: 16px;
           display: flex;
           flex-direction: column;
-          justify-content: flex-start;
+          align-items: center;
+          text-align: center;
         }
       `}</style>
       
       <div className="container">
         <div className="measureWrap">
-          <div className="imgBox">
-            <Image
-              alt="Measurement illustration"
-              src="/assets/Frame 1707479253.png"
-              width={350}
-              height={350}
-              style={{
-                position: "absolute",
-                top: "100px", 
-                left: "126px",
-              }}
-            />
-          </div>
-          
           <div className="textBox">
             <h1
               style={{
-                width: "561px",
-                height: "86px",
+                width: "294px",
+                height: "auto",
                 fontFamily: "Monument Extended, sans-serif",
                 fontWeight: 400,
-                fontSize: "36px",
+                fontSize: "24px",
                 lineHeight: "100%",
                 letterSpacing: "0%",
                 color: "#1A1A1A",
+                textAlign: "center",
                 margin: 0,
               }}
             >
@@ -82,19 +71,35 @@ const MeasurementDesktop = () => {
             </h1>
             <p
               style={{
-                width: "561px",
-                height: "81px",
+                width: "294px",
+                height: "auto",
                 fontFamily: "Manrope, sans-serif",
                 fontWeight: 400,
-                fontSize: "20px",
-                lineHeight: "100%",
+                fontSize: "16px",
+                lineHeight: "150%",
                 letterSpacing: "0%",
                 color: "#6E6E6EB2",
+                textAlign: "center",
                 margin: 0,
               }}
             >
               From human bodies to complex objects and interior spaces, Data Capturing adapts seamlessly — analyzing shape, proportion, and scale in one intelligent scan.
             </p>
+          </div>
+          
+          <div className="imgBox">
+            <Image
+              alt="Measurement illustration"
+              src="/assets/Frame 1707479253.png"
+              width={274}
+              height={274}
+              style={{
+                position: "absolute",
+                top: "42px",
+                left: "50%",
+                marginLeft: "-137px",
+              }}
+            />
           </div>
         </div>
       </div>
@@ -102,4 +107,4 @@ const MeasurementDesktop = () => {
   );
 };
 
-export default MeasurementDesktop;
+export default MeasurementMobile;
