@@ -81,7 +81,7 @@ export default function LoginPage() {
         
         console.log('🚀 User role detected:', userRole)
         
-        if (userRole === 'organisation' || userRole === 'organization') {
+        if (userRole === 'organisation' || userRole === 'organization' || userRole === 'admin') {
           toast({ 
             title: "LOGIN SUCCESSFUL!",
             description: "Welcome to the admin dashboard!"
