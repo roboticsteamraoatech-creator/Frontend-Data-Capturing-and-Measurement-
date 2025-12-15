@@ -83,7 +83,7 @@ function VerifyOtpContent() {
         
         const userRole = response.data.user.role?.toLowerCase();
         
-        if (userRole === 'organisation' || userRole === 'organization') {
+        if (userRole === 'organisation' || userRole === 'organization' || userRole === 'admin') {
           toast({ 
             title: "OTP VERIFIED!",
             description: "Welcome to the admin dashboard!"

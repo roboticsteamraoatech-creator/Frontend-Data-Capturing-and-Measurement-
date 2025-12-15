@@ -28,9 +28,9 @@ export const LogoutModal = ({ isOpen, onConfirm, onCancel }: LogoutModalProps) =
       <div
         className="fixed"
         style={{
-          top: '216px',
+          top: '50%',
           left: '50%',
-          transform: 'translateX(-50%)',
+          transform: 'translate(-50%, -50%)',
           width: '596px',
           height: '266px',
           background: '#FFFFFF',
