@@ -108,11 +108,13 @@ const CallToActionSection = () => {
       const base64Data = await convertToBase64(file)
       
       // Upload photo
-      const response = await fetch('/api/photos/upload', {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API || 'https://datacapture-backend.onrender.com';
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${backendUrl}/api/photos/upload`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          ...(token && { 'Authorization': `Bearer ${token}` })
         },
         body: JSON.stringify({
           imageData: base64Data,

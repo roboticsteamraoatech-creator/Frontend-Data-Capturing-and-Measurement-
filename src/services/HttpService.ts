@@ -1,7 +1,7 @@
 export class HttpService {
   private baseUrl: string;
 
-  constructor(baseUrl: string = '/api') {
+  constructor(baseUrl: string = process.env.NEXT_PUBLIC_BACKEND_API || 'https://datacapture-backend.onrender.com') {
     this.baseUrl = baseUrl;
   }
 

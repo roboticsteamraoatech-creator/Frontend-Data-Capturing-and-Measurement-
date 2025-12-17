@@ -1,31 +1,10 @@
-// import { memo } from 'react';
-// import Navbar from '../components/navbar';
-// import Footer from '../Home/footer/page';
-// import ReadyToCapture from '../Home/capture/page';
-// import AboutPage from './hero/page';
-// import { GoalsSection } from './goals/page';
-// import { ValueSection } from './values/page';
-// const Page = () => {
-//   return (
-//     <div>
-//       <Navbar/>
-//       <AboutPage/>
-//       <GoalsSection/>
-//       <ValueSection/>
-//       <ReadyToCapture/>
-//       <Footer/>
-//     </div>
-//   );
-// };
-
-// export default memo(Page);
 
 
 "use client"
 import { memo } from 'react';
 import Navbar from '../components/navbar';
 import Footer from '../Home/footer/page';
-// import ReadyToCapture from '../Home/capture/page';
+
 import AboutPage from './hero/page';
 import { GoalsSection } from './goals/page';
 import { ValueSection } from './values/page';
@@ -46,7 +25,10 @@ const Page = () => {
       `}</style>
       
       <Navbar/>
-      <AboutPage/>
+      <div  style={{marginBottom: "200px"}}>
+         <AboutPage/>
+      </div>
+     
       <div style={{marginBottom: "200px",marginTop: "200px"}}>
         <GoalsSection/>
       </div>

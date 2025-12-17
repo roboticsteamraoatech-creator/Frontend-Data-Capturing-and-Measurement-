@@ -1,15 +1,18 @@
-"use client"
+"use client";
+
 import { useState, useRef, useEffect } from 'react';
-import { Upload, RefreshCw, Trash2, Camera } from 'lucide-react';
-import Navbar from '@/app/components/navbar';
-import Head from 'next/head';
 import { useAuthContext } from '@/AuthContext';
 import { useRouter } from 'next/navigation';
+import Head from 'next/head';
+import Navbar from '@/app/components/navbar';
+import { RefreshCw, Upload, Camera, Trash2 } from 'lucide-react';
+import UploadImageSignUpModal from '@/components/modals/UploadImageSignUpModal';
 
-const UploadPage = () => {
+const UploadPageContent = ({ searchParams }: { searchParams: { type?: string } }) => {
   const { token } = useAuthContext();
   const router = useRouter();
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showUploadSignupModal, setShowUploadSignupModal] = useState(false);
   const [frontImage, setFrontImage] = useState<string | null>(null);
   const [sideImage, setSideImage] = useState<string | null>(null);
   const [measurements, setMeasurements] = useState({
@@ -51,13 +54,17 @@ const UploadPage = () => {
   const frontInputRef = useRef<HTMLInputElement>(null);
   const sideInputRef = useRef<HTMLInputElement>(null);
 
-  // Check authentication on component mount
+  // Check authentication on component mount and get measurement type from URL
   useEffect(() => {
-    // If user is not authenticated, show auth modal
-    if (!token) {
-      setShowAuthModal(true);
+    // Get measurement type from URL parameters
+    const type = searchParams?.type;
+    if (type === 'object' || type === 'yourself') {
+      setMeasurementType(type);
     }
-  }, [token]);
+    
+    // Remove the automatic modal showing on component mount
+    // The modal should only show when user tries to download/save, not on page load
+  }, [searchParams]);
 
   // Add font loading effect
   useEffect(() => {
@@ -80,12 +87,6 @@ const UploadPage = () => {
   }, []);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'front' | 'side') => {
-    // Check if user is authenticated before allowing upload
-    if (!token) {
-      setShowAuthModal(true);
-      return;
-    }
-    
     const file = e.target.files?.[0];
     if (file) {
       const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
@@ -122,7 +123,7 @@ const UploadPage = () => {
       return;
     }
 
-    const heightInCm = parseFloat(userHeight) * 2.54;
+    const heightInCm = parseFloat(userHeight);
 
     if (heightInCm < 1 || heightInCm > 300) {
       setUploadError("Height must be between 1 and 300 centimeters");
@@ -133,6 +134,25 @@ const UploadPage = () => {
     setUploadError(null);
   };
 
+  // Convert image data URL to base64
+  const convertDataUrlToBase64 = (dataUrl: string): string => {
+    const base64 = dataUrl.split(',')[1];
+    return base64 || '';
+  };
+
+  // Get file name from data URL
+  const getFileNameFromDataUrl = (dataUrl: string): string => {
+    const timestamp = Date.now();
+    const extension = dataUrl.split(';')[0].split('/')[1] || 'jpg';
+    return `image_${timestamp}.${extension}`;
+  };
+
+  // Get mime type from data URL
+  const getMimeTypeFromDataUrl = (dataUrl: string): string => {
+    const mimeType = dataUrl.split(';')[0].split(':')[1] || 'image/jpeg';
+    return mimeType;
+  };
+
   const analyzeAndUploadImage = async (imageData: string, type: 'front' | 'side') => {
     if (type === 'front') {
       setAnalyzingFront(true);
@@ -141,29 +161,79 @@ const UploadPage = () => {
     }
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Convert height to cm - assuming input is already in centimeters
+      const heightInCm = parseFloat(userHeight);
+      
+      // Validate height is in reasonable range (1-300 cm)
+      if (heightInCm < 1 || heightInCm > 300) {
+        throw new Error('Height must be between 1 and 300 centimeters');
+      }
+      
+      console.log('Uploading with height:', heightInCm, 'cm (input was:', userHeight, ')');
+      
+      // Prepare data for upload
+      const base64Data = convertDataUrlToBase64(imageData);
+      const fileName = getFileNameFromDataUrl(imageData);
+      const mimeType = getMimeTypeFromDataUrl(imageData);
+      
+      // Upload directly to backend API
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API || 'https://datacapture-backend.onrender.com';
+      console.log('Uploading to backend with token:', token);
+      const response = await fetch(`${backendUrl}/api/photos/upload`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        },
+        body: JSON.stringify({
+          imageData: base64Data, // Send just the base64 data, not the full data URL
+          height: heightInCm,
+          mimeType: mimeType,
+          fileName: fileName
+        })
+      });
 
-      if (type === 'front') {
-        setMeasurements({
-          chest: '10.00',
-          waist: '20.00',
-          hips: '38.00',
-          legs: '40.00'
-        });
+      if (!response.ok) {
+        throw new Error(`Upload failed with status ${response.status}`);
       }
 
-      // Simulating upload
-      console.log('Uploading image...', type);
+      const result = await response.json();
+      console.log('Upload successful:', result);
+
+      // Update measurements with actual data if available
+      if (result.data?.measurements) {
+        console.log('Setting measurements from result.data.measurements:', result.data.measurements);
+        setMeasurements(result.data.measurements);
+      } else if (result.measurements) {
+        console.log('Setting measurements from result.measurements:', result.measurements);
+        setMeasurements(result.measurements);
+      } else {
+        console.log('No measurements in response, using simulated measurements');
+        // Simulate measurements if not provided
+        if (type === 'front') {
+          setMeasurements({
+            chest: '10.00',
+            waist: '20.00',
+            hips: '38.00',
+            legs: '40.00'
+          });
+        }
+      }
+
+      // Move to next step
+      if (type === 'front') {
+        setCurrentStep('side');
+      } else {
+        setCurrentStep('complete');
+      }
     } catch (error) {
       console.error('Analysis or upload failed:', error);
       setUploadError('Failed to analyze image or upload photo');
     } finally {
       if (type === 'front') {
         setAnalyzingFront(false);
-        setCurrentStep('side');
       } else {
         setAnalyzingSide(false);
-        setCurrentStep('complete');
       }
     }
   };
@@ -180,6 +250,12 @@ const UploadPage = () => {
   };
 
   const handleDownload = () => {
+    // Check if user is authenticated before allowing download
+    if (!token || token === '') {
+      setShowUploadSignupModal(true);
+      return;
+    }
+    
     const data = `Body Measurements
 
 Chest: ${measurements.chest} cm
@@ -196,12 +272,6 @@ Legs: ${measurements.legs} cm`;
   };
 
   const triggerFileInput = (type: 'front' | 'side') => {
-    // Check if user is authenticated before allowing upload
-    if (!token) {
-      setShowAuthModal(true);
-      return;
-    }
-    
     if (type === 'front') {
       frontInputRef.current?.click();
     } else {
@@ -210,12 +280,6 @@ Legs: ${measurements.legs} cm`;
   };
 
   const triggerCamera = (type: 'front' | 'side') => {
-    // Check if user is authenticated before allowing upload
-    if (!token) {
-      setShowAuthModal(true);
-      return;
-    }
-    
     if (type === 'front') {
       if (frontInputRef.current) {
         frontInputRef.current.setAttribute('capture', 'environment');
@@ -230,10 +294,21 @@ Legs: ${measurements.legs} cm`;
   };
 
   const handleLoginRedirect = () => {
+    setShowAuthModal(false);
+    setShowUploadSignupModal(false);
     router.push('/auth/login');
   };
 
   const handleSignupRedirect = () => {
+    setShowAuthModal(false);
+    setShowUploadSignupModal(false);
+    router.push('/auth/signup');
+  };
+
+  const handleGoogleSignup = () => {
+    // For now, redirect to signup page which should have Google option
+    setShowAuthModal(false);
+    setShowUploadSignupModal(false);
     router.push('/auth/signup');
   };
 
@@ -246,94 +321,13 @@ Legs: ${measurements.legs} cm`;
       <div className="min-h-screen bg-gray-50">
         <Navbar />
 
-        {/* Authentication Required Modal */}
-        {showAuthModal && (
-          <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(255, 255, 255, 0.7)' }}>
-            <div
-              className="bg-white rounded-[20px] shadow-lg"
-              style={{
-                width: "596px",
-                height: "330px",
-                borderRadius: "20px",
-                background: "#FFFFFF",
-                padding: "52px 60px 42px 60px",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between"
-              }}
-            >
-              <div>
-                <div
-                  style={{
-                    fontFamily: "Manrope",
-                    fontWeight: 600,
-                    fontSize: "22px",
-                    lineHeight: "100%",
-                    color: "#1A1A1A",
-                    marginBottom: "32px"
-                  }}
-                >
-                  Authentication Required
-                </div>
-
-                <div>
-                  <div
-                    style={{
-                      fontFamily: "Manrope",
-                      fontWeight: 400,
-                      fontSize: "16px",
-                      lineHeight: "140%",
-                      color: "#6E6E6E",
-                      marginBottom: "12px",
-                    }}
-                  >
-                    Please log in or sign up to upload images and get measurements.
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-center" style={{ gap: "20px" }}>
-                <button
-                  onClick={handleSignupRedirect}
-                  className="rounded-[20px] text-white"
-                  style={{
-                    width: "120px",
-                    height: "38px",
-                    backgroundColor: '#5D2A8B',
-                    borderRadius: "20px",
-                    fontFamily: "Manrope",
-                    fontWeight: 500,
-                    fontSize: "16px",
-                    padding: "8px 10px",
-                    cursor: 'pointer'
-                  }}
-                >
-                  Sign Up
-                </button>
-                <button
-                  onClick={handleLoginRedirect}
-                  className="rounded-[20px] text-white"
-                  style={{
-                    width: "120px",
-                    height: "38px",
-                    backgroundColor: '#5D2A8B',
-                    borderRadius: "20px",
-                    fontFamily: "Manrope",
-                    fontWeight: 500,
-                    fontSize: "16px",
-                    padding: "8px 10px",
-                    cursor: 'pointer'
-                  }}
-                >
-                  Login
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <UploadImageSignUpModal 
+          isOpen={showUploadSignupModal} 
+          onClose={() => setShowUploadSignupModal(false)} 
+        />
 
         {showHeightModal && token && (
-          <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(255, 255, 255, 0.7)' }}>
+          <div className="fixed inset-0 flex items-center justify-center z-[60]" style={{ backgroundColor: 'rgba(255, 255, 255, 0.7)' }}>
             <div
               className="bg-white rounded-[20px] shadow-lg"
               style={{
@@ -372,14 +366,14 @@ Legs: ${measurements.legs} cm`;
                       marginBottom: "12px",
                     }}
                   >
-                    Enter your Height (Inches)
+                    Enter your Height (Centimeters)
                   </div>
 
                   <input
                     type="number"
                     value={userHeight}
                     onChange={(e) => setUserHeight(e.target.value)}
-                    placeholder="Height in inches"
+                    placeholder="Height in centimeters"
                     className="border rounded-[10px]"
                     style={{
                       width: "493px",
@@ -389,11 +383,7 @@ Legs: ${measurements.legs} cm`;
                       borderColor: "#6E6E6E4D",
                       fontFamily: "Manrope",
                       padding: "0 16px",
-                      fontSize: "16px"
                     }}
-                    step="0.1"
-                    min="40"
-                    max="100"
                   />
                 </div>
               </div>
@@ -480,7 +470,7 @@ Legs: ${measurements.legs} cm`;
               {userHeight && (
                 <div className="mt-4 p-3 bg-purple-50 rounded-lg inline-block">
                   <p className="text-purple-800 font-medium">
-                    Height: {userHeight} inches
+                    Height: {userHeight} cm
                   </p>
                   <button
                     onClick={() => setShowHeightModal(true)}
@@ -544,52 +534,21 @@ Legs: ${measurements.legs} cm`;
                         </div>
                       )}
                     </div>
-                    <p className="text-xs text-center mt-2" style={{ color: '#5D2A8B99' }}>
-                      **analyzing side image**
-                    </p>
-                    
-                    {frontImage && !analyzingFront && (
-                      <div className="flex justify-center mt-6">
-                        <button
-                          onClick={() => setCurrentStep('side')}
-                          className="px-8 py-3 rounded-full text-white"
-                          style={{ backgroundColor: '#5D2A8B', fontFamily: 'Manrope', fontWeight: 500 }}
-                        >
-                          Next
-                        </button>
-                      </div>
-                    )}
+                    <div className="mt-2 flex items-center justify-center gap-2">
+                      <p className="text-xs" style={{ color: '#5D2A8B99' }}>
+                        {frontImage ? '**Front image measured**' : '**Front image**'}
+                      </p>
+                      {frontImage && (
+                        <span className="text-lg" style={{ color: '#5D2A8B99' }}>✓</span>
+                      )}
+                    </div>
                   </div>
                 )}
 
-                {/* Show Side Image Upload with Front Thumbnail */}
+                {/* Show Side Image Upload */}
                 {currentStep === 'side' && (
-                  <div className="mb-6">
-                    {/* Thumbnails at top */}
-                    <div className="flex gap-3 mb-4 justify-center">
-                      {frontImage && (
-                        <div className="relative" style={{ width: '50px', height: '50px' }}>
-                          <img
-                            src={frontImage}
-                            alt="Front thumbnail"
-                            className="w-full h-full object-cover rounded-[10px]"
-                            style={{ border: '1px solid #5D2A8B' }}
-                          />
-                        </div>
-                      )}
-                      {sideImage && (
-                        <div className="relative" style={{ width: '50px', height: '50px' }}>
-                          <img
-                            src={sideImage}
-                            alt="Side thumbnail"
-                            className="w-full h-full object-cover rounded-[10px]"
-                            style={{ border: '1px solid #5D2A8B' }}
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="relative rounded-lg overflow-hidden" style={{ height: '400px' }}>
+                  <div>
+                    <div className="relative bg-gray-100 rounded-lg overflow-hidden mb-4" style={{ height: '400px' }}>
                       {sideImage ? (
                         <>
                           <img
@@ -607,23 +566,12 @@ Legs: ${measurements.legs} cm`;
                           )}
                         </>
                       ) : (
-                        <div className="absolute inset-0 flex items-center justify-center" style={{
-                          background: '#FAF7FD',
-                          border: '1px dashed #EEB0FE99',
-                          borderRadius: '20px'
-                        }}>
+                        <div className="absolute inset-0 flex items-center justify-center">
                           <label className="cursor-pointer text-center">
-                            <div className="w-16 h-16 mx-auto mb-3 flex items-center justify-center">
-                              <Camera className="w-10 h-10" style={{ color: '#5D2A8B' }} />
+                            <div className="w-12 h-12 text-gray-400 mx-auto mb-2 flex items-center justify-center">
+                              <Camera className="w-full h-full" />
                             </div>
-                            <p style={{
-                              fontFamily: 'Manrope, sans-serif',
-                              fontWeight: 300,
-                              fontSize: '18px',
-                              lineHeight: '100%',
-                              letterSpacing: '0%',
-                              color: '#5D2A8B'
-                            }}>Take a side view picture</p>
+                            <span className="text-sm text-gray-500">Click to take photo or upload</span>
                             <input
                               ref={sideInputRef}
                               type="file"
@@ -635,60 +583,30 @@ Legs: ${measurements.legs} cm`;
                         </div>
                       )}
                     </div>
-                    <p className="text-xs text-center mt-2" style={{ color: '#5D2A8B99' }}>
-                      **Side image measured**
-                    </p>
+                    
+                    <div className="mt-2 flex items-center justify-center gap-2 mb-6">
+                      <p className="text-xs" style={{ color: '#5D2A8B99' }}>
+                        {sideImage ? '**Side image measured**' : '**Side image**'}
+                      </p>
+                      {sideImage && (
+                        <span className="text-lg" style={{ color: '#5D2A8B99' }}>✓</span>
+                      )}
+                    </div>
 
-                    {sideImage && !analyzingSide && (
-                      <div className="flex justify-center mt-6">
-                        <button
-                          onClick={() => setCurrentStep('complete')}
-                          className="px-8 py-3 rounded-full text-white"
-                          style={{ backgroundColor: '#5D2A8B', fontFamily: 'Manrope', fontWeight: 500 }}
-                        >
-                          Next
-                        </button>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h3 className="text-sm font-medium mb-3" style={{ color: '#5D2A8B' }}>Measurements:</h3>
+                      <div className="space-y-2">
+                        {Object.entries(displayedMeasurements).map(([key, value]) => (
+                          <div key={key} className="flex justify-between text-sm">
+                            <span style={{ color: '#6E6E6E', textTransform: 'capitalize' }}>{key}:</span>
+                            <span className="font-medium" style={{ color: '#6E6E6E' }}>{value} cm</span>
+                          </div>
+                        ))}
                       </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Show Results */}
-                {currentStep === 'complete' && (
-                  <div>
-                    <div className="bg-gray-50 rounded-lg p-6 shadow-md">
-                      <div className="mb-6">
-                        <div className="flex items-center justify-between mb-4">
-                          <h3 className="text-sm font-medium" style={{ color: '#5D2A8B' }}>Measurement:</h3>
-                          <button
-                            onClick={() => setShowAllMeasurements(!showAllMeasurements)}
-                            className="hover:opacity-80 transition-opacity"
-                            style={{
-                              fontFamily: 'Manrope, sans-serif',
-                              fontWeight: 300,
-                              fontSize: '10px',
-                              lineHeight: '100%',
-                              textDecoration: 'underline',
-                              color: '#5D2A8B'
-                            }}
-                          >
-                            {showAllMeasurements ? 'See less' : 'See more'}
-                          </button>
-                        </div>
-
-                        <div className="space-y-4">
-                          {Object.entries(displayedMeasurements).map(([key, value]) => (
-                            <div key={key} className="flex items-center justify-between pb-3" style={{ borderBottom: '1px solid #E5E7EB' }}>
-                              <span style={{ color: '#6E6E6E', textTransform: 'capitalize' }}>{key}:</span>
-                              <span className="font-medium" style={{ color: '#6E6E6E' }}>{value} cm</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
+                      
                       <button
                         onClick={handleDownload}
-                        className="w-full hover:opacity-90 text-white font-medium py-3 px-6 rounded-lg transition-opacity"
+                        className="mt-4 w-full hover:opacity-90 text-white font-medium py-2 px-4 rounded-lg transition-opacity"
                         style={{ 
                           backgroundColor: '#5D2A8B',
                           opacity: !frontImage ? 0.5 : 1
@@ -698,6 +616,33 @@ Legs: ${measurements.legs} cm`;
                         Download
                       </button>
                     </div>
+                  </div>
+                )}
+
+                {/* Show Completion State */}
+                {currentStep === 'complete' && (
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="text-sm font-medium mb-3" style={{ color: '#5D2A8B' }}>Measurements:</h3>
+                    <div className="space-y-2">
+                      {Object.entries(displayedMeasurements).map(([key, value]) => (
+                        <div key={key} className="flex justify-between text-sm">
+                          <span style={{ color: '#6E6E6E', textTransform: 'capitalize' }}>{key}:</span>
+                          <span className="font-medium" style={{ color: '#6E6E6E' }}>{value} cm</span>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <button
+                      onClick={handleDownload}
+                      className="mt-4 w-full hover:opacity-90 text-white font-medium py-2 px-4 rounded-lg transition-opacity"
+                      style={{ 
+                        backgroundColor: '#5D2A8B',
+                        opacity: !frontImage ? 0.5 : 1
+                      }}
+                      disabled={!frontImage}
+                    >
+                      Download
+                    </button>
                   </div>
                 )}
               </div>
@@ -881,22 +826,15 @@ Legs: ${measurements.legs} cm`;
                         <button
                           onClick={() => setShowAllMeasurements(!showAllMeasurements)}
                           className="hover:opacity-80 transition-opacity"
-                          style={{
-                            fontFamily: 'Manrope, sans-serif',
-                            fontWeight: 300,
-                            fontSize: '10px',
-                            lineHeight: '100%',
-                            textDecoration: 'underline',
-                            color: '#5D2A8B'
-                          }}
+                          style={{ color: '#5D2A8B' }}
                         >
-                          {showAllMeasurements ? 'See less' : 'See more'}
+                          {showAllMeasurements ? 'Show Less' : 'Show More'}
                         </button>
                       </div>
-
-                      <div className="space-y-4">
+                      
+                      <div className="space-y-2">
                         {Object.entries(displayedMeasurements).map(([key, value]) => (
-                          <div key={key} className="flex items-center justify-between pb-3" style={{ borderBottom: '1px solid #E5E7EB' }}>
+                          <div key={key} className="flex justify-between text-sm">
                             <span style={{ color: '#6E6E6E', textTransform: 'capitalize' }}>{key}:</span>
                             <span className="font-medium" style={{ color: '#6E6E6E' }}>{value} cm</span>
                           </div>
@@ -926,4 +864,9 @@ Legs: ${measurements.legs} cm`;
   );
 };
 
-export default UploadPage;
+// Main page component - this is the Server Component
+export default function UploadPage({ searchParams }: { searchParams: { type?: string } }) {
+  return (
+    <UploadPageContent searchParams={searchParams} />
+  );
+};

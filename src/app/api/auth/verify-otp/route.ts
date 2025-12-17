@@ -7,7 +7,8 @@ export async function POST(request: NextRequest) {
     console.log('🔄 Proxying verify OTP request to backend:', body);
 
     // Forward the request to the actual backend
-    const response = await fetch(`${process.env.BACKEND_URL}/api/auth/verify-otp`, {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API || process.env.BACKEND_URL || 'https://datacapture-backend.onrender.com';
+    const response = await fetch(`${backendUrl}/api/auth/verify-otp`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

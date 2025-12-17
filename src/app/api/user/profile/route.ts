@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Forward the request to the backend
-    const backendUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API || process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'https://datacapture-backend.onrender.com';
     console.log('Fetching profile from:', `${backendUrl}/api/auth/profile`);
     const response = await fetch(`${backendUrl}/api/auth/profile`, {
       method: 'GET',
