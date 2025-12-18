@@ -588,7 +588,7 @@ export default function SelfMeasurementForm() {
                   )}
                 </div>
 
-                {/* Footer Buttons - Fixed at bottom */}
+                
                 {step === 2 && (
                   <div className="flex flex-col-reverse md:flex-row justify-end gap-3 p-4 md:p-6 border-t border-gray-200 flex-shrink-0">
                     <button
