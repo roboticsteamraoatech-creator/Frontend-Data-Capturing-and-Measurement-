@@ -45,7 +45,8 @@ const MeasurementDesktop = () => {
           justify-content: flex-start;
         }
       `}</style>
-      
+
+
       <div className="container">
         <div className="measureWrap">
           <div className="imgBox">
