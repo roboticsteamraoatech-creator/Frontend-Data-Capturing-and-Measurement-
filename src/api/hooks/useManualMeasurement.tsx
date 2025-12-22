@@ -20,6 +20,9 @@ export interface Measurement {
   subject: string;
   createdAt: string;
   sections: MeasurementSection[];
+  // Add image references with correct field names
+  frontImageUrl?: string;
+  sideImageUrl?: string;
 }
 
 export interface MeasurementSaveRequest {
@@ -28,6 +31,9 @@ export interface MeasurementSaveRequest {
   firstName: string;
   lastName: string;
   sections: MeasurementSection[];
+  // Add image references with correct field names
+  frontImageUrl?: string;
+  sideImageUrl?: string;
 }
 
 // Hook for fetching all measurements

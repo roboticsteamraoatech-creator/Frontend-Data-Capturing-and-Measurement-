@@ -71,4 +71,19 @@ export class HttpService {
     });
     return this.handleResponse<T>(response);
   }
+
+  // Add method for uploading images
+  async uploadImage<T>(imageData: string, height: number, mimeType: string, fileName: string): Promise<T> {
+    const response = await fetch(`${this.baseUrl}/api/photos/upload`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        imageData,
+        height,
+        mimeType,
+        fileName
+      }),
+    });
+    return this.handleResponse<T>(response);
+  }
 }

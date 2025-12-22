@@ -24,23 +24,33 @@ interface BodySection {
 }
 
 interface SelfMeasurementFormValues {
-  // Removed formId from here
   firstName: string;
   lastName: string;
   measurementType: string;
   subject: string;
   bodySections: BodySection[];
+  frontImageUrl?: string;
+  sideImageUrl?: string;
 }
 
-// Remove the generateFormId function entirely
-// const generateFormId = () => {
-//   const timestamp = Date.now();
-//   const random = Math.random().toString(36).substring(2, 11);
-//   return `CUR001-${timestamp.toString().slice(-6)}-${random.slice(0, 3).toUpperCase()}`;
-// };
+const initialValues: SelfMeasurementFormValues = {
+  firstName: "",
+  lastName: "",
+  measurementType: "Manual",
+  subject: "Self",
+  bodySections: [
+    {
+      sectionName: "",
+      measurements: [
+        { bodyPartName: "", size: "" },
+      ],
+    },
+  ],
+  frontImageUrl: undefined,
+  sideImageUrl: undefined,
+};
 
 const validationSchema = Yup.object().shape({
-  // Removed formId from validation
   firstName: Yup.string().required("First name is required"),
   lastName: Yup.string().required("Last name is required"),
   measurementType: Yup.string().required("Measurement type is required"),
@@ -62,30 +72,15 @@ const validationSchema = Yup.object().shape({
     .min(1, "At least one section is required"),
 });
 
-const initialValues: SelfMeasurementFormValues = {
-  // Removed formId
-  firstName: "",
-  lastName: "",
-  measurementType: "Manual",
-  subject: "Self",
-  bodySections: [
-    {
-      sectionName: "",
-      measurements: [
-        { bodyPartName: "", size: "" },
-      ],
-    },
-  ],
-};
-
 export default function SelfMeasurementForm() {
   const router = useRouter();
   const { profile } = useProfile();
   const [isCreating, setIsCreating] = useState(false);
   const [step, setStep] = useState(1);
-  // Removed formId state
   const [frontImage, setFrontImage] = useState<File | null>(null);
   const [sideImage, setSideImage] = useState<File | null>(null);
+  const [frontImagePreview, setFrontImagePreview] = useState<string | null>(null);
+  const [sideImagePreview, setSideImagePreview] = useState<string | null>(null);
   const [customSection, setCustomSection] = useState("");
   const saveMeasurementMutation = useSaveManualMeasurement();
   const { data: sectionOptions = [], isLoading: isLoadingSections } = useSectionOptions();
@@ -104,15 +99,76 @@ export default function SelfMeasurementForm() {
     return null;
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'front' | 'side', setFieldValue: (field: string, value: any) => void) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      toast({
+        title: "Error",
+        description: "Invalid file type. Please upload a JPEG, PNG, or WebP image.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (10MB limit)
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: "Error",
+        description: "File size exceeds 10MB limit.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        const imageData = event.target.result as string;
+        if (type === 'front') {
+          setFrontImagePreview(imageData);
+          setFieldValue('frontImageUrl', imageData); // Store base64 data
+        } else {
+          setSideImagePreview(imageData);
+          setFieldValue('sideImageUrl', imageData); // Store base64 data
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmit = async (values: SelfMeasurementFormValues) => {
     setIsCreating(true);
     try {
+      // If we have images, we need to upload them first
+      let frontImageUrl: string | undefined = undefined;
+      let sideImageUrl: string | undefined = undefined;
+      
+      // Upload images if they exist
+      if (values.frontImageUrl) {
+        // In a real implementation, we would upload to a server here
+        // For now, we'll just store the base64 data
+        frontImageUrl = values.frontImageUrl;
+      }
+      
+      if (values.sideImageUrl) {
+       
+        sideImageUrl = values.sideImageUrl;
+      }
+      
       const payload = {
-        // Do NOT include formId in the payload - server will generate it
+
         measurementType: values.measurementType,
         subject: values.subject,
         firstName: values.firstName,
         lastName: values.lastName,
+    
+        frontImageUrl: frontImageUrl || undefined,
+        sideImageUrl: sideImageUrl || undefined,
         sections: values.bodySections.map(section => ({
           sectionName: section.sectionName,
           measurements: section.measurements.map(m => ({
@@ -251,7 +307,6 @@ export default function SelfMeasurementForm() {
                   {/* Step 1: Initial Setup */}
                   {step === 1 && (
                     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-                      {/* Form ID section removed - server will generate it */}
 
                       {/* Measurement Type and Subject */}
                       <div className="space-y-4 md:space-y-0 md:grid md:grid-cols-2 md:gap-4">
@@ -321,25 +376,40 @@ export default function SelfMeasurementForm() {
                         </div>
                       </div>
 
-                      {/* Image Uploads */}
+                      {/* Image Uploads - Modified to show previews */}
                       <div className="space-y-4 md:space-y-0 md:grid md:grid-cols-2 md:gap-4">
                         <div>
                           <label className="manrope block text-sm font-medium text-gray-700 mb-2">
                             Upload Front Image
                           </label>
-                          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 md:p-8 text-center hover:border-purple-500 transition-colors cursor-pointer">
+                          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 md:p-8 text-center hover:border-purple-500 transition-colors">
                             <input
                               type="file"
                               accept="image/*"
-                              onChange={(e) => setFrontImage(e.target.files?.[0] || null)}
+                              onChange={(e) => handleImageUpload(e, 'front', setFieldValue)}
                               className="hidden"
                               id="front-image"
                             />
                             <label htmlFor="front-image" className="cursor-pointer">
-                              <Upload className="w-6 h-6 md:w-8 md:h-8 text-purple-500 mx-auto mb-2" />
-                              <p className="manrope text-xs md:text-sm text-gray-500">
-                                {frontImage ? frontImage.name : "Upload front view"}
-                              </p>
+                              {frontImagePreview ? (
+                                <div className="relative">
+                                  <img 
+                                    src={frontImagePreview} 
+                                    alt="Front view preview" 
+                                    className="mx-auto max-h-40 rounded"
+                                  />
+                                  <p className="manrope text-xs md:text-sm text-gray-500 mt-2">
+                                    Click to change front image
+                                  </p>
+                                </div>
+                              ) : (
+                                <>
+                                  <Upload className="w-6 h-6 md:w-8 md:h-8 text-purple-500 mx-auto mb-2" />
+                                  <p className="manrope text-xs md:text-sm text-gray-500">
+                                    Upload front view
+                                  </p>
+                                </>
+                              )}
                             </label>
                           </div>
                         </div>
@@ -347,19 +417,34 @@ export default function SelfMeasurementForm() {
                           <label className="manrope block text-sm font-medium text-gray-700 mb-2">
                             Upload Side Image
                           </label>
-                          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 md:p-8 text-center hover:border-purple-500 transition-colors cursor-pointer">
+                          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 md:p-8 text-center hover:border-purple-500 transition-colors">
                             <input
                               type="file"
                               accept="image/*"
-                              onChange={(e) => setSideImage(e.target.files?.[0] || null)}
+                              onChange={(e) => handleImageUpload(e, 'side', setFieldValue)}
                               className="hidden"
                               id="side-image"
                             />
                             <label htmlFor="side-image" className="cursor-pointer">
-                              <Upload className="w-6 h-6 md:w-8 md:h-8 text-purple-500 mx-auto mb-2" />
-                              <p className="manrope text-xs md:text-sm text-gray-500">
-                                {sideImage ? sideImage.name : "Upload side view"}
-                              </p>
+                              {sideImagePreview ? (
+                                <div className="relative">
+                                  <img 
+                                    src={sideImagePreview} 
+                                    alt="Side view preview" 
+                                    className="mx-auto max-h-40 rounded"
+                                  />
+                                  <p className="manrope text-xs md:text-sm text-gray-500 mt-2">
+                                    Click to change side image
+                                  </p>
+                                </div>
+                              ) : (
+                                <>
+                                  <Upload className="w-6 h-6 md:w-8 md:h-8 text-purple-500 mx-auto mb-2" />
+                                  <p className="manrope text-xs md:text-sm text-gray-500">
+                                    Upload side view
+                                  </p>
+                                </>
+                              )}
                             </label>
                           </div>
                         </div>

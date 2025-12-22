@@ -3,14 +3,20 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { MeasurementTopNav } from '@/app/components/MeasurementTopNav';
-import { useManualMeasurement, useUpdateManualMeasurement, MeasurementSection, MeasurementData } from '@/api/hooks/useManualMeasurement';
-import { ArrowLeft, Save } from 'lucide-react';
+import { useManualMeasurement, useUpdateManualMeasurement, MeasurementSection, MeasurementData, Measurement } from '@/api/hooks/useManualMeasurement';
+import { ArrowLeft, Save, Upload } from 'lucide-react';
 
 interface MeasurementDataSummary {
   chest: string;
   waist: string;
   hips: string;
   legs: string;
+}
+
+// Add image state to the component
+interface MeasurementWithImages extends Measurement {
+  frontImage?: string;
+  sideImage?: string;
 }
 
 // Separate component for the main content that uses useSearchParams
@@ -30,6 +36,30 @@ const EditMeasurementContent = () => {
   });
   
   const [sections, setSections] = useState<any[]>([]);
+  
+  const [frontImagePreview, setFrontImagePreview] = useState<string | null>(null);
+  const [sideImagePreview, setSideImagePreview] = useState<string | null>(null);
+  
+  // Load measurement data when it's available
+  useEffect(() => {
+    if (measurement) {
+      setFormData({
+        firstName: measurement.firstName || '',
+        lastName: measurement.lastName || '',
+        measurementType: measurement.measurementType || '',
+        subject: measurement.subject || ''
+      });
+      setSections(measurement.sections || []);
+      
+      // Set image previews if they exist
+      if ('frontImageUrl' in measurement && measurement.frontImageUrl) {
+        setFrontImagePreview(measurement.frontImageUrl);
+      }
+      if ('sideImageUrl' in measurement && measurement.sideImageUrl) {
+        setSideImagePreview(measurement.sideImageUrl);
+      }
+    }
+  }, [measurement]);
 
   const getSummaryMeasurements = () => {
     if (!measurement) {
@@ -77,19 +107,6 @@ const EditMeasurementContent = () => {
     return summary.slice(0, 4);
   };
 
-  // Load measurement data when it's available
-  useEffect(() => {
-    if (measurement) {
-      setFormData({
-        firstName: measurement.firstName || '',
-        lastName: measurement.lastName || '',
-        measurementType: measurement.measurementType || '',
-        subject: measurement.subject || ''
-      });
-      setSections(measurement.sections || []);
-    }
-  }, [measurement]);
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -98,11 +115,52 @@ const EditMeasurementContent = () => {
     }));
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'front' | 'side') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      // In a real implementation, we would show an error message
+      return;
+    }
+
+    // Validate file size (10MB limit)
+    if (file.size > 10 * 1024 * 1024) {
+      // In a real implementation, we would show an error message
+      return;
+    }
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        const imageData = event.target.result as string;
+        if (type === 'front') {
+          setFrontImagePreview(imageData);
+        } else {
+          setSideImagePreview(imageData);
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSave = () => {
     if (!id) return;
     
+    // Prepare data with images
+    const updateData = {
+      ...formData,
+      sections,
+      // Include image data if available
+      ...(frontImagePreview && { frontImageUrl: frontImagePreview }),
+      ...(sideImagePreview && { sideImageUrl: sideImagePreview })
+    };
+    
     updateMeasurement(
-      { id, ...formData, sections },
+      { id, ...updateData },
       {
         onSuccess: () => {
           router.push(`/user/body-measurement/view?id=${id}`);
@@ -189,6 +247,73 @@ const EditMeasurementContent = () => {
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          {/* Images Preview Section - Added */}
+          <div className="mb-6 pb-6 border-b border-gray-200">
+            <h2 className="manrope text-xl font-semibold text-gray-800 mb-4">
+              Uploaded Images
+            </h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="manrope text-sm text-gray-500 mb-2">Front View</p>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleImageUpload(e, 'front')}
+                    className="hidden"
+                    id="edit-front-image"
+                  />
+                  <label htmlFor="edit-front-image" className="cursor-pointer">
+                    {frontImagePreview ? (
+                      <img 
+                        src={frontImagePreview} 
+                        alt="Front view" 
+                        className="w-full h-auto max-h-48 object-contain rounded"
+                      />
+                    ) : (
+                      <>
+                        <Upload className="w-8 h-8 text-purple-500 mx-auto mb-2" />
+                        <p className="manrope text-sm text-gray-500">
+                          Upload front view
+                        </p>
+                      </>
+                    )}
+                  </label>
+                </div>
+              </div>
+              
+              <div>
+                <p className="manrope text-sm text-gray-500 mb-2">Side View</p>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleImageUpload(e, 'side')}
+                    className="hidden"
+                    id="edit-side-image"
+                  />
+                  <label htmlFor="edit-side-image" className="cursor-pointer">
+                    {sideImagePreview ? (
+                      <img 
+                        src={sideImagePreview} 
+                        alt="Side view" 
+                        className="w-full h-auto max-h-48 object-contain rounded"
+                      />
+                    ) : (
+                      <>
+                        <Upload className="w-8 h-8 text-purple-500 mx-auto mb-2" />
+                        <p className="manrope text-sm text-gray-500">
+                          Upload side view
+                        </p>
+                      </>
+                    )}
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+          
           {/* Basic Information */}
           <div className="mb-6 pb-6 border-b border-gray-200">
             <h2 className="manrope text-xl font-semibold text-gray-800 mb-4">

@@ -138,6 +138,39 @@ function MeasurementDetailContent() {
               </div>
             </div>
 
+            {/* Images Preview Section - Added */}
+            {(measurement.frontImageUrl || measurement.sideImageUrl) && (
+              <div className="mb-6 pb-6 border-b border-gray-200">
+                <h2 className="manrope text-xl font-semibold text-gray-800 mb-4">
+                  Uploaded Images
+                </h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {measurement.frontImageUrl && (
+                    <div>
+                      <p className="manrope text-sm text-gray-500 mb-2">Front View</p>
+                      <img 
+                        src={measurement.frontImageUrl} 
+                        alt="Front view" 
+                        className="w-full h-auto max-h-64 object-contain rounded border border-gray-200"
+                      />
+                    </div>
+                  )}
+                  
+                  {measurement.sideImageUrl && (
+                    <div>
+                      <p className="manrope text-sm text-gray-500 mb-2">Side View</p>
+                      <img 
+                        src={measurement.sideImageUrl} 
+                        alt="Side view" 
+                        className="w-full h-auto max-h-64 object-contain rounded border border-gray-200"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
             {/* Sections and Measurements */}
             <div className="space-y-6">
               <h2 className="manrope text-xl font-semibold text-gray-800">
