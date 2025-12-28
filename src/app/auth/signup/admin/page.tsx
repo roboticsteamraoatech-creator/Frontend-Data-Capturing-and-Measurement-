@@ -129,6 +129,25 @@ export default function OrganizationSignupPage() {
         setErrors(prev => ({ ...prev, phone: '' }));
       }
       
+      // Handle duplicate email errors
+      if (errorMessage.includes('email') && 
+          (errorMessage.includes('duplicate') || 
+           errorMessage.includes('already exists') ||
+           errorMessage.includes('taken') ||
+           errorMessage.includes('already registered'))) {
+        setErrors(prev => ({ ...prev, email: 'This email address is already registered.' }));
+      } else if (message.includes('A user with email') && message.includes('already exists')) {
+        // Handle the specific error format from the server
+        const emailMatch = message.match(/A user with email ([^\s@]+@[^\s@]+\.[^\s@]+) already exists/);
+        if (emailMatch) {
+          setErrors(prev => ({ ...prev, email: `A user with email ${emailMatch[1]} already exists` }));
+        } else {
+          setErrors(prev => ({ ...prev, email: message }));
+        }
+      } else {
+        setErrors(prev => ({ ...prev, email: '' }));
+      }
+      
       // Set the error message and show the modal instead of toast
       setErrorMessage(message);
       setShowErrorModal(true);
@@ -149,6 +168,7 @@ export default function OrganizationSignupPage() {
     if (!formValues.name.trim()) newErrors.name = 'Full name is required';
     if (!formValues.email.trim()) newErrors.email = 'Email is required';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formValues.email)) newErrors.email = 'Invalid email address';
+    else if (errors.email && (errors.email.includes('already registered') || errors.email.includes('already exists'))) newErrors.email = errors.email;
     if (!formValues.phone.trim()) newErrors.phone = 'Phone number is required';
     else if (!/^(\+?234|0)?[789][01]\d{8}$/.test(formValues.phone.replace(/\s/g, ''))) newErrors.phone = 'Please enter a valid Nigerian phone number';
     else if (errors.phone && errors.phone.includes('already registered')) newErrors.phone = errors.phone;

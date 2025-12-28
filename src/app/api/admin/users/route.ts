@@ -34,10 +34,18 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify(transformedBody),
     });
 
-    const data = await response.json();
-
-    // Return the response from the backend
-    return NextResponse.json(data, { status: response.status });
+    // Check if response is JSON before parsing
+    const contentType = response.headers.get('content-type');
+    let data;
+    if (contentType && contentType.includes('application/json')) {
+      data = await response.json();
+      // Return the response from the backend
+      return NextResponse.json(data, { status: response.status });
+    } else {
+      // If not JSON, return text response
+      const textData = await response.text();
+      return new NextResponse(textData, { status: response.status, headers: { 'content-type': 'text/plain' } });
+    }
   } catch (error) {
     console.error('❌ Proxy error:', error);
     return NextResponse.json(
@@ -71,10 +79,18 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const data = await response.json();
-
-    // Return the response from the backend
-    return NextResponse.json(data, { status: response.status });
+    // Check if response is JSON before parsing
+    const contentType = response.headers.get('content-type');
+    let data;
+    if (contentType && contentType.includes('application/json')) {
+      data = await response.json();
+      // Return the response from the backend
+      return NextResponse.json(data, { status: response.status });
+    } else {
+      // If not JSON, return text response
+      const textData = await response.text();
+      return new NextResponse(textData, { status: response.status, headers: { 'content-type': 'text/plain' } });
+    }
   } catch (error) {
     console.error('❌ Proxy error:', error);
     return NextResponse.json(

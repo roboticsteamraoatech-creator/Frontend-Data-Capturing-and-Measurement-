@@ -85,3 +85,47 @@ export async function PUT(
     );
   }
 }
+
+// DELETE /api/admin/users/:userId - Delete user by ID
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ userId: string }> }
+) {
+  try {
+    const { userId } = await params;
+    
+    console.log('🔄 Proxying user deletion request to backend for user:', userId);
+
+    // Get the backend URL from environment variables
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API || process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'https://datacapture-backend.onrender.com';
+    
+    // Get the authorization token from the incoming request
+    const authHeader = request.headers.get('authorization');
+    
+    // Forward the request to the actual backend
+    const response = await fetch(`${backendUrl}/admin/users/${userId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authHeader && { 'Authorization': authHeader }),
+      },
+    });
+
+    // For DELETE, we might not have JSON response data
+    if (response.status === 204) {
+      // No content response
+      return new NextResponse(null, { status: 204 });
+    }
+    
+    const data = await response.json();
+
+    // Return the response from the backend
+    return NextResponse.json(data, { status: response.status });
+  } catch (error) {
+    console.error('❌ Proxy error:', error);
+    return NextResponse.json(
+      { message: 'Failed to delete user', error: String(error) },
+      { status: 500 }
+    );
+  }
+}

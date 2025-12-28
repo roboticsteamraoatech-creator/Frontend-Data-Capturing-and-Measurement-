@@ -21,6 +21,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import UserActionModal from '@/app/components/userActionModal';
+import DeleteConfirmationModal from '@/app/components/DeleteConfirmationModal';
 import { useRouter } from 'next/navigation';
 import { AdminUserService, AdminUser } from '@/services/AdminUserService';
 
@@ -52,6 +53,13 @@ const ActiveUsersPage = () => {
     isOpen: false,
     userId: null,
     position: { top: 0, left: 0 }
+  });
+  
+  // State for delete confirmation modal
+  const [deleteModal, setDeleteModal] = useState({
+    isOpen: false,
+    userId: null as string | null,
+    userName: ''
   });
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -126,16 +134,46 @@ const ActiveUsersPage = () => {
   };
 
   // Handle user deletion
-  const handleDeleteUser = (userId: string) => {
+  const handleDeleteUser = async (userId: string) => {
     const userToDelete = users.find(user => user.id === userId);
-    if (userToDelete && window.confirm(`Are you sure you want to delete user ${userToDelete.fullName}?`)) {
-      setUsers(users.filter(user => user.id !== userId));
-      toast({ 
-        title: 'Success', 
-        description: `User ${userToDelete.fullName} deleted successfully`,
-        variant: 'default'
+    if (userToDelete) {
+      setDeleteModal({
+        isOpen: true,
+        userId,
+        userName: userToDelete.fullName
       });
     }
+  };
+
+  // Confirm user deletion
+  const confirmDeleteUser = async () => {
+    if (!deleteModal.userId) return;
+    
+    const userToDelete = users.find(user => user.id === deleteModal.userId);
+    if (userToDelete) {
+      try {
+        const adminUserService = new AdminUserService();
+        await adminUserService.deleteAdminUser(deleteModal.userId);
+        
+        toast({ 
+          title: 'Success', 
+          description: `User ${userToDelete.fullName} deleted successfully`,
+          variant: 'default'
+        });
+        
+        // Refetch users to update counts and pagination
+        await fetchActiveUsers();
+      } catch (error: any) {
+        console.error('Error deleting user:', error);
+        toast({ 
+          title: 'Error', 
+          description: error.message || 'Failed to delete user',
+          variant: 'destructive'
+        });
+      }
+    }
+    
+    setDeleteModal({ isOpen: false, userId: null, userName: '' });
   };
 
   // Handle export to Excel
@@ -246,11 +284,13 @@ const ActiveUsersPage = () => {
   };
 
   // Handle page change
-  const handlePageChange = (newPage: number) => {
+  const handlePageChange = async (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setCurrentPage(newPage);
+      await fetchActiveUsers();
     }
   };
+
 
   // Handle status change
   const handleStatusChange = async (userId: string, newStatus: 'pending' | 'active' | 'disabled' | 'archived') => {
@@ -627,6 +667,15 @@ const ActiveUsersPage = () => {
           position={actionModal.position}
         />
       )}
+      
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, userId: null, userName: '' })}
+        onConfirm={confirmDeleteUser}
+        itemName={deleteModal.userName}
+        itemType="user"
+      />
     </div>
   );
 };
