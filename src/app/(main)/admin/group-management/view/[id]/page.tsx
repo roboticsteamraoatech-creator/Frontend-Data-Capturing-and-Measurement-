@@ -1,34 +1,34 @@
-"use client";
+'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Edit } from 'lucide-react';
-import { RoleService, Role } from '@/services/RoleService';
+import { GroupService, Group } from '@/services/GroupService';
 import { toast } from '@/app/components/hooks/use-toast';
 
-const ViewRolePage = () => {
+const ViewGroupPage = () => {
   const router = useRouter();
   const params = useParams();
-  const roleId = params.id as string;
+  const groupId = params.id as string;
   
-  const [role, setRole] = useState<Role | null>(null);
+  const [group, setGroup] = useState<Group | null>(null);
   const [loading, setLoading] = useState(true);
-  
+
   useEffect(() => {
-    fetchRole();
-  }, [roleId]);
-  
-  const fetchRole = async () => {
+    fetchGroup();
+  }, [groupId]);
+
+  const fetchGroup = async () => {
     try {
       setLoading(true);
-      const roleService = new RoleService();
-      const response = await roleService.getRoleById(roleId);
-      setRole(response.data.role);
+      const groupService = new GroupService();
+      const response = await groupService.getGroupById(groupId);
+      setGroup(response.data.group);
     } catch (error: any) {
-      console.error('Error fetching role:', error);
+      console.error('Error fetching group:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to fetch role',
+        description: error.message || 'Failed to fetch group',
         variant: 'destructive',
       });
     } finally {
@@ -45,20 +45,20 @@ const ViewRolePage = () => {
             className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
-            Back to Role Management
+            Back to Group Management
           </button>
           
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#5D2A8B] mx-auto mb-4"></div>
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">Loading Role...</h2>
-            <p className="text-gray-600">Please wait while we fetch the role details.</p>
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">Loading Group...</h2>
+            <p className="text-gray-600">Please wait while we fetch the group details.</p>
           </div>
         </div>
       </div>
     );
   }
   
-  if (!role) {
+  if (!group) {
     return (
       <div className="manrope ml-0 md:ml-[350px] pt-8 md:pt-8 p-4 md:p-8 min-h-screen">
         <div className="max-w-4xl mx-auto">
@@ -67,12 +67,12 @@ const ViewRolePage = () => {
             className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
-            Back to Role Management
+            Back to Group Management
           </button>
           
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">Role Not Found</h2>
-            <p className="text-gray-600">The requested role could not be found.</p>
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">Group Not Found</h2>
+            <p className="text-gray-600">The requested group could not be found.</p>
           </div>
         </div>
       </div>
@@ -95,76 +95,76 @@ const ViewRolePage = () => {
               className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
             >
               <ArrowLeft className="w-5 h-5 mr-2" />
-              Back to Role Management
+              Back to Group Management
             </button>
             
             <div className="flex flex-col md:flex-row md:items-center md:justify-between">
               <div>
-                <h1 className="text-2xl font-bold text-gray-800">{role.name}</h1>
-                <p className="text-gray-600 mt-1">{role.description}</p>
+                <h1 className="text-2xl font-bold text-gray-800">{group.name}</h1>
+                <p className="text-gray-600 mt-1">{group.description}</p>
               </div>
               
               <button
-                onClick={() => router.push(`/super-admin/role-management/edit/${role.id}`)}
+                onClick={() => router.push(`/admin/group-management/edit/${group.id}`)}
                 className="mt-4 md:mt-0 px-4 py-2 bg-[#5D2A8B] text-white rounded-lg hover:bg-purple-700 transition-colors duration-200 flex items-center gap-2"
               >
                 <Edit className="w-4 h-4" />
-                Edit Role
+                Edit Group
               </button>
             </div>
           </div>
 
-          {/* Role Details */}
+          {/* Group Details */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">Role Information</h2>
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Group Information</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-500 mb-1">Role ID</label>
-                <p className="text-gray-900">{role.id}</p>
+                <label className="block text-sm font-medium text-gray-500 mb-1">Group ID</label>
+                <p className="text-gray-900">{group.id}</p>
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-500 mb-1">Role Name</label>
-                <p className="text-gray-900">{role.name}</p>
+                <label className="block text-sm font-medium text-gray-500 mb-1">Group Name</label>
+                <p className="text-gray-900">{group.name}</p>
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-500 mb-1">Description</label>
-                <p className="text-gray-900">{role.description || 'No description provided'}</p>
+                <p className="text-gray-900">{group.description || 'No description provided'}</p>
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-500 mb-1">Created At</label>
                 <p className="text-gray-900">
-                  {new Date(role.createdAt).toLocaleDateString()} at {new Date(role.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {new Date(group.createdAt).toLocaleDateString()} at {new Date(group.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </p>
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-500 mb-1">Last Updated</label>
                 <p className="text-gray-900">
-                  {new Date(role.updatedAt).toLocaleDateString()} at {new Date(role.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {new Date(group.updatedAt).toLocaleDateString()} at {new Date(group.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Permissions */}
+          {/* Members */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">Assigned Permissions</h2>
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Group Members</h2>
             
-            {role.permissions.length === 0 ? (
-              <p className="text-gray-500 italic">No permissions assigned to this role</p>
+            {group.memberIds.length === 0 ? (
+              <p className="text-gray-500 italic">No members assigned to this group</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {role.permissions.map((permission, index) => (
+                {group.memberIds.map((memberId, index) => (
                   <div 
                     key={index}
                     className="border border-gray-200 rounded-lg p-4"
                   >
-                    <div className="font-medium text-gray-900 capitalize">
-                      {permission.replace(/_/g, ' ')}
+                    <div className="font-medium text-gray-900">
+                      {memberId}
                     </div>
                   </div>
                 ))}
@@ -177,4 +177,4 @@ const ViewRolePage = () => {
   );
 };
 
-export default ViewRolePage;
+export default ViewGroupPage;

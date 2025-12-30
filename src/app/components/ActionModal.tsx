@@ -64,7 +64,7 @@ const ActionModal: React.FC<ActionModalProps> = ({
             Edit Measurement
           </button>
           
-          <button 
+          {/* <button 
             className="manrope text-left p-3 rounded-lg hover:bg-gray-50 transition-colors text-base text-[#1A1A1A]"
             onClick={(e) => {
               e.stopPropagation();
@@ -72,7 +72,7 @@ const ActionModal: React.FC<ActionModalProps> = ({
             }}
           >
             Share
-          </button>
+          </button> */}
           
           <button 
             className="manrope text-left p-3 rounded-lg hover:bg-gray-50 transition-colors text-base text-[#FF6161]"

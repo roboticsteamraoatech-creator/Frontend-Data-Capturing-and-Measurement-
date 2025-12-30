@@ -154,9 +154,9 @@ const Page = () => {
       name: `${item.firstName} ${item.lastName}`,
       type: type,
       color: color,
-      measurements: item.sections.flatMap((section: any) => 
-        section.measurements.map((m: any) => m.size)
-      ).slice(0, 4), // Take only first 4 measurements to match UI
+      measurements: item.sections ? item.sections.flatMap((section: any) => 
+        section.measurements ? section.measurements.map((m: any) => m.size) : []
+      ).slice(0, 4) : [], // Take only first 4 measurements to match UI
       sections: item.sections, // Keep the sections data for table headers
       createdAt: item.createdAt
     };

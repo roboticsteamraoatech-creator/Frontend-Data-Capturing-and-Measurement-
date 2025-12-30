@@ -41,20 +41,37 @@ function VerifyEmailContent() {
   });
   const [errors, setErrors] = useState<Partial<OtpFormValues>>({});
   const [apiError, setApiError] = useState<string | null>(null);
-  const [timer, setTimer] = useState<number>(30);
+  // Changed from 30 seconds to 600 seconds (10 minutes)
+  const [timer, setTimer] = useState<number>(600);
   const [canResend, setCanResend] = useState<boolean>(false);
+  const [formattedTime, setFormattedTime] = useState<string>("10:00");
 
-  // Timer for resend OTP
+  // Timer for resend OTP - 10 minutes
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     
     if (timer > 0) {
       interval = setInterval(() => {
-        setTimer((prev) => prev - 1);
+        setTimer((prev) => {
+          const newTime = prev - 1;
+          
+          // Format time as MM:SS
+          const minutes = Math.floor(newTime / 60);
+          const seconds = newTime % 60;
+          setFormattedTime(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+          
+          return newTime;
+        });
       }, 1000);
     } else {
       setCanResend(true);
+      setFormattedTime("00:00");
     }
+    
+    // Initialize formatted time
+    const initialMinutes = Math.floor(timer / 60);
+    const initialSeconds = timer % 60;
+    setFormattedTime(`${initialMinutes.toString().padStart(2, '0')}:${initialSeconds.toString().padStart(2, '0')}`);
     
     return () => {
       if (interval) clearInterval(interval);
@@ -115,7 +132,8 @@ function VerifyEmailContent() {
       return data;
     },
     onSuccess: () => {
-      setTimer(30);
+      // Reset to 10 minutes (600 seconds)
+      setTimer(600);
       setCanResend(false);
       toast({ 
         title: "OTP Sent",
@@ -258,7 +276,7 @@ function VerifyEmailContent() {
           width: 484px;
           height: 60px;
           border: 1px solid #6E6E6E4D;
-          border-radius: 10px;
+          border-radius: 30px; /* Changed to fully rounded */
           background: white;
           transition: border-color 0.2s ease;
           margin: 0 auto;
@@ -307,8 +325,8 @@ function VerifyEmailContent() {
           top: -10px;
           left: 30px;
           font-family: 'Manrope', sans-serif;
-          font-weight: 400;
-          font-size: 14px;
+          font-weight: 400,
+          fontSize: "14px",
           color: #5D2A8B;
           background: white;
           padding: 0 5px;
@@ -409,7 +427,7 @@ function VerifyEmailContent() {
           <div className="text-center mb-6">
             {!canResend ? (
               <p className="manrope text-sm text-[#6E6E6E]">
-                Resend OTP in {timer}s
+                Resend OTP in {formattedTime}
               </p>
             ) : (
               <button
@@ -479,26 +497,21 @@ function VerifyEmailContent() {
             />
           </div>
 
-          {/* Right Form Section */}
+          {/* Right Form Section - Changed to flex */}
           <div 
-            className="absolute"
+            className="absolute flex flex-col"
             style={{
               width: "609px",
               height: "935px",
               top: "35px",
               left: "785px",
               borderRadius: "40px",
-              background: "#FBFAFC"
+              background: "#FBFAFC",
+              padding: "0 50px"
             }}
           >
-            {/* Logo */}
-            <div 
-              className="absolute"
-              style={{
-                top: "50px",
-                left: "50px"
-              }}
-            >
+            {/* Logo - Top */}
+            <div className="mt-12">
               <Image 
                 width={55} 
                 height={48} 
@@ -508,15 +521,12 @@ function VerifyEmailContent() {
               />
             </div>
 
-            {/* Header */}
+            {/* Header Section - Flexed and spaced */}
             <div 
-              className="absolute"
+              className="flex flex-col mt-16"
               style={{
-                width: "501px",
-                height: "77px",
-                top: "136px",
-                left: "50px",
-                gap: "16px"
+                width: "100%",
+                gap: "24px"
               }}
             >
               <h1 
@@ -526,54 +536,51 @@ function VerifyEmailContent() {
                   fontWeight: 400,
                   lineHeight: "100%",
                   color: "#1A1A1A",
-                  width: "317px",
-                  height: "36px",
-                  margin: 0,
-                  marginBottom: "16px"
+                  margin: 0
                 }}
               >
                 Verify Your Email
               </h1>
-              <p 
-                className="manrope"
-                style={{
-                  fontWeight: 300,
-                  fontSize: "18px",
-                  lineHeight: "100%",
-                  color: "#6E6E6EB2",
-                  width: "501px",
-                  height: "25px",
-                  margin: 0
-                }}
-              >
-                Enter the 6-digit code sent to your email
-              </p>
-              {email && (
+              
+              {/* Paragraph text lowered with margin-top */}
+              <div className="flex flex-col gap-4">
                 <p 
                   className="manrope"
                   style={{
-                    fontWeight: 500,
-                    fontSize: "16px",
-                    lineHeight: "100%",
-                    color: "#5D2A8B",
-                    width: "501px",
-                    height: "25px",
-                    margin: "10px 0 0 0"
+                    fontWeight: 300,
+                    fontSize: "18px",
+                    lineHeight: "140%",
+                    color: "#6E6E6EB2",
+                    margin: 0,
+                    marginTop: "12px" /* Lowered the text */
                   }}
                 >
-                  {email}
+                  Enter the 6-digit code sent to your email
                 </p>
-              )}
+                
+                {email && (
+                  <p 
+                    className="manrope"
+                    style={{
+                      fontWeight: 500,
+                      fontSize: "16px",
+                      lineHeight: "100%",
+                      color: "#5D2A8B",
+                      margin: 0
+                    }}
+                  >
+                    {email}
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Error Alert */}
             {apiError && (
               <div 
-                className="absolute"
+                className="mt-8"
                 style={{
-                  top: "273px",
-                  left: "50px",
-                  width: "484px"
+                  width: "100%"
                 }}
               >
                 <div 
@@ -614,13 +621,12 @@ function VerifyEmailContent() {
               </div>
             )}
 
-            {/* OTP Input */}
+            {/* OTP Input Section - Flexed */}
             <div 
-              className="absolute"
+              className="flex flex-col mt-8"
               style={{
-                top: apiError ? "373px" : "273px",
-                left: "50px",
-                transition: "top 0.3s ease"
+                width: "100%",
+                gap: "8px"
               }}
             >
               <div className={`input-container ${formValues.otp ? 'has-value' : ''} ${errors.otp ? 'error' : ''}`}>
@@ -638,27 +644,24 @@ function VerifyEmailContent() {
                 )}
               </div>
               {errors.otp && (
-                <p style={{ color: "#ef4444", fontSize: "14px", marginTop: "4px", fontFamily: "Manrope" }}>
+                <p style={{ color: "#ef4444", fontSize: "14px", marginTop: "4px", fontFamily: "Manrope", textAlign: "center" }}>
                   {errors.otp}
                 </p>
               )}
             </div>
 
-            {/* Resend OTP */}
+            {/* Resend OTP - Flexed */}
             <div 
-              className="absolute"
+              className="flex justify-center mt-4"
               style={{
-                top: apiError ? "478px" : "378px",
-                left: "50px",
-                width: "484px",
-                height: "25px",
-                transition: "top 0.3s ease"
+                width: "100%",
+                height: "25px"
               }}
             >
               <div className="text-center">
                 {!canResend ? (
                   <p className="manrope" style={{ color: "#6E6E6E", fontSize: "16px" }}>
-                    Resend OTP in <span style={{ color: "#5D2A8B", fontWeight: 500 }}>{timer}</span> seconds
+                    Resend OTP in <span style={{ color: "#5D2A8B", fontWeight: 500 }}>{formattedTime}</span> minutes
                   </p>
                 ) : (
                   <button
@@ -682,13 +685,11 @@ function VerifyEmailContent() {
               </div>
             </div>
 
-            {/* Verify Button */}
+            {/* Verify Button - Flexed */}
             <div 
-              className="absolute"
+              className="flex flex-col items-center mt-8"
               style={{
-                top: apiError ? "543px" : "443px",
-                left: "50px",
-                transition: "top 0.3s ease"
+                width: "100%"
               }}
             >
               <button 
@@ -696,10 +697,10 @@ function VerifyEmailContent() {
                 onClick={handleSubmit}
                 disabled={isVerifying || formValues.otp.length !== 6}
                 style={{
-                  width: "484px",
+                  width: "100%",
                   height: "60px",
                   background: "#5D2A8B",
-                  borderRadius: "10px",
+                  borderRadius: "30px", /* Also rounded full for consistency */
                   border: "none",
                   color: "white",
                   fontFamily: "Manrope",
@@ -713,15 +714,14 @@ function VerifyEmailContent() {
               </button>
             </div>
 
-            {/* Back to Login */}
+            {/* Back to Login - Flexed */}
             <div 
-              className="absolute"
+              className="flex justify-center mt-8"
               style={{
-                top: apiError ? "618px" : "518px",
-                left: "50px",
-                width: "484px",
+                width: "100%",
                 height: "25px",
-                transition: "top 0.3s ease"
+                marginTop: "auto",
+                marginBottom: "60px"
               }}
             >
               <p 
