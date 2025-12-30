@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Dispatch, SetStateAction, ReactNode, useState } from 'react';
+import React, { Dispatch, SetStateAction, ReactNode, useState, useEffect, useRef } from 'react';
 import { 
   Menu,
   User,
@@ -54,25 +54,15 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ onShow, setShow }) => {
   const pathname = usePathname();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
   
   const toggleSidebar = (): string => onShow ? "block" : "hidden";
-  const toggleLeftPadding = (): string => onShow ? "pl-4 md:pl-12" : "";
 
   // Helper function to check if a route is active
   const isActive = (route: string): boolean => {
     if (route === '/admin' && pathname === '/admin') return true;
     if (route !== '/admin' && pathname.startsWith(route)) return true;
     return false;
-  };
-
-  // Helper function to get active styles
-  const getActiveStyles = (route: string) => {
-    return isActive(route) ? {
-      background: '#5D2A8B',
-      borderRadius: '20px',
-      width: '275px',
-      height: '71px'
-    } : {};
   };
 
   // Helper function to get text color
@@ -172,6 +162,12 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ onShow, setShow }) => {
       route: '/admin/role-management', 
       icon: <Shield className="w-6 h-6" />,
     },
+    { 
+      id: 'group-management', 
+      name: 'Group Management', 
+      route: '/admin/group-management', 
+      icon: <User className="w-6 h-6" />, // Using User icon as a placeholder
+    },
   ];
 
   return (
@@ -201,20 +197,23 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ onShow, setShow }) => {
             padding: 0 20px;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            justify-content: space-between;
+            height: calc(100vh - 140px);
           }
           
           .menu-item-container {
             display: flex !important;
             flex-direction: column !important;
             gap: 8px !important;
-            margin-top: 100px !important;
+            margin-top: 20px !important;
           }
           
           .sidebar-logout {
-            position: fixed !important;
-            bottom: 30px !important;
-            left: 38px !important;
+            position: relative !important;
+            bottom: auto !important;
+            left: auto !important;
+            margin-top: auto;
+            padding: 20px 0;
           }
         }
         
@@ -268,7 +267,8 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ onShow, setShow }) => {
       )}
       
       <div 
-        className={`${toggleSidebar()} sidebar-container bg-[#FFFFFF] fixed overflow-y-auto shadow-sm`}
+        ref={sidebarRef}
+        className={`${toggleSidebar()} sidebar-container bg-[#FFFFFF] fixed overflow-y-auto shadow-sm flex flex-col`}
         style={{
           width: '328px',
           height: '100vh',
@@ -316,7 +316,14 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ onShow, setShow }) => {
           </button>
         </div>
 
-        <nav className="sidebar-nav-container" style={{ marginTop: '120px' }}>
+        <nav 
+          className="sidebar-nav-container flex flex-col justify-between" 
+          style={{ 
+            marginTop: '120px',
+            height: 'calc(100vh - 180px)',
+            paddingBottom: '20px'
+          }}
+        >
           <div className="menu-item-container flex flex-col" style={{ gap: '12px' }}>
             {/* Admin Menu Items */}
             {adminMenuItems.map((item: MenuItem) => (
@@ -352,7 +359,7 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ onShow, setShow }) => {
                             lineHeight: '100%',
                             color: getTextColor(item.route),
                             flex: 1,
-                            minWidth: 0 // This ensures text truncation works
+                            minWidth: 0
                           }}
                         >
                           {item.name}
@@ -392,7 +399,7 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ onShow, setShow }) => {
                             lineHeight: '100%',
                             color: isSubmenuActive(item.subItems) ? '#FFFFFF' : '#6E6E6EB2',
                             flex: 1,
-                            minWidth: 0 // This ensures text truncation works
+                            minWidth: 0
                           }}
                         >
                           {item.name}
@@ -451,15 +458,14 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ onShow, setShow }) => {
             ))}
           </div>
 
-          {/* Logout Module */}
+          {/* Logout Module - Positioned at the bottom */}
           <div 
-            className="sidebar-logout"
+            className="sidebar-logout mt-auto"
             style={{
-              position: 'absolute',
-              bottom: '40px',
-              left: '38px',
               display: 'flex',
-              alignItems: 'center'
+              alignItems: 'center',
+              paddingTop: '30px',
+              marginLeft: '38px'
             }}
           >
             <button 
@@ -494,7 +500,6 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ onShow, setShow }) => {
           positioning="fixed left-4 z-[1000]"
           icon={<Menu className="h-6 w-6" />}
           onClick={() => setShow(!onShow)}
-          toggleLeftPadding={toggleLeftPadding()}
         />
       )}
     </aside>

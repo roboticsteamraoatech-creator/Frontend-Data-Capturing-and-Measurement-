@@ -2,61 +2,88 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Edit } from 'lucide-react';
+import { ArrowLeft, Edit, X } from 'lucide-react';
+import { RoleService, Role } from '@/services/RoleService';
+import { toast } from '@/app/components/hooks/use-toast';
 
-interface Role {
-  id: string;
-  name: string;
-  description: string;
-  permissions: string[];
-  createdAt: string;
-  updatedAt: string;
-}
+
 
 const ViewRolePage = () => {
   const router = useRouter();
   const params = useParams();
   const roleId = params.id as string;
   
-  // Mock role data
   const [role, setRole] = useState<Role | null>(null);
+  const [loading, setLoading] = useState(true);
+  
+  // State for permission modal
+  const [permissionModal, setPermissionModal] = useState({
+    isOpen: false,
+    permissions: [] as string[],
+    roleName: ''
+  });
+  
+  // Open permission modal
+  const openPermissionModal = (permissions: string[], roleName: string) => {
+    setPermissionModal({
+      isOpen: true,
+      permissions,
+      roleName
+    });
+  };
+  
+  // Close permission modal
+  const closePermissionModal = () => {
+    setPermissionModal({
+      isOpen: false,
+      permissions: [],
+      roleName: ''
+    });
+  };
   
   useEffect(() => {
-    // In a real app, this would fetch from an API
-    const mockRoles: Role[] = [
-      { 
-        id: 'ROLE-001', 
-        name: 'Administrator', 
-        description: 'Can manage users and organisations', 
-        permissions: [
-          'create_user', 'view_user', 'edit_user', 'archive_user', 'enable_disable_user',
-          'create_group', 'view_group', 'edit_group'
-        ],
-        createdAt: '2023-02-20T14:45:00Z', 
-        updatedAt: '2023-02-20T14:45:00Z'
-      },
-      { 
-        id: 'ROLE-002', 
-        name: 'Organisation Admin', 
-        description: 'Can manage organisation users and settings', 
-        permissions: ['create_user', 'view_user', 'edit_user'],
-        createdAt: '2023-03-10T09:15:00Z', 
-        updatedAt: '2023-03-10T09:15:00Z'
-      },
-      { 
-        id: 'ROLE-003', 
-        name: 'Content Manager', 
-        description: 'Can create and manage content', 
-        permissions: ['content_management'],
-        createdAt: '2023-04-05T16:20:00Z', 
-        updatedAt: '2023-04-05T16:20:00Z'
-      },
-    ];
-    
-    const foundRole = mockRoles.find(r => r.id === roleId);
-    setRole(foundRole || null);
+    fetchRoleData();
   }, [roleId]);
+  
+  const fetchRoleData = async () => {
+    try {
+      setLoading(true);
+      const roleService = new RoleService();
+      const response = await roleService.getRoleById(roleId);
+      setRole(response.data.role);
+    } catch (error: any) {
+      console.error('Error fetching role:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to fetch role data',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  if (loading) {
+    return (
+      <div className="manrope ml-0 md:ml-[350px] pt-8 md:pt-8 p-4 md:p-8 min-h-screen">
+        <div className="max-w-4xl mx-auto">
+          <button 
+            onClick={() => router.back()}
+            className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
+          >
+            <ArrowLeft className="w-5 h-5 mr-2" />
+            Back to Role Management
+          </button>
+          
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#5D2A8B] mx-auto"></div>
+            <p className="text-gray-600 mt-4">Loading role...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
   if (!role) {
     return (
       <div className="manrope ml-0 md:ml-[350px] pt-8 md:pt-8 p-4 md:p-8 min-h-screen">
@@ -94,7 +121,7 @@ const ViewRolePage = () => {
               className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
             >
               <ArrowLeft className="w-5 h-5 mr-2" />
-              Back to Role Management
+              Back 
             </button>
             
             <div className="flex flex-col md:flex-row md:items-center md:justify-between">
@@ -102,14 +129,6 @@ const ViewRolePage = () => {
                 <h1 className="text-2xl font-bold text-gray-800">{role.name}</h1>
                 <p className="text-gray-600 mt-1">{role.description}</p>
               </div>
-              
-              <button
-                onClick={() => router.push(`/admin/role-management/edit/${role.id}`)}
-                className="mt-4 md:mt-0 px-4 py-2 bg-[#5D2A8B] text-white rounded-lg hover:bg-purple-700 transition-colors duration-200 flex items-center gap-2"
-              >
-                <Edit className="w-4 h-4" />
-                Edit Role
-              </button>
             </div>
           </div>
 
@@ -118,10 +137,7 @@ const ViewRolePage = () => {
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Role Information</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-500 mb-1">Role ID</label>
-                <p className="text-gray-900">{role.id}</p>
-              </div>
+             
               
               <div>
                 <label className="block text-sm font-medium text-gray-500 mb-1">Role Name</label>
@@ -140,12 +156,7 @@ const ViewRolePage = () => {
                 </p>
               </div>
               
-              <div>
-                <label className="block text-sm font-medium text-gray-500 mb-1">Last Updated</label>
-                <p className="text-gray-900">
-                  {new Date(role.updatedAt).toLocaleDateString()} at {new Date(role.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </p>
-              </div>
+              
             </div>
           </div>
 
@@ -156,22 +167,58 @@ const ViewRolePage = () => {
             {role.permissions.length === 0 ? (
               <p className="text-gray-500 italic">No permissions assigned to this role</p>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {role.permissions.map((permission, index) => (
-                  <div 
-                    key={index}
-                    className="border border-gray-200 rounded-lg p-4"
-                  >
-                    <div className="font-medium text-gray-900 capitalize">
-                      {permission.replace(/_/g, ' ')}
-                    </div>
-                  </div>
-                ))}
+              <div className="flex items-center">
+                <button 
+                  className="text-purple-600 hover:text-purple-800 font-medium"
+                  onClick={() => openPermissionModal(role.permissions, role.name)}
+                >
+                  View {role.permissions.length} Permissions
+                </button>
               </div>
             )}
           </div>
         </div>
       </div>
+      
+      {/* Permission Modal */}
+      {permissionModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-white bg-opacity-0" onClick={closePermissionModal}></div>
+          <div className="relative bg-white rounded-xl shadow-lg z-50 w-full max-w-md max-h-[80vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Permissions for {permissionModal.roleName}</h3>
+                <button 
+                  onClick={closePermissionModal}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="space-y-2">
+                {permissionModal.permissions.map((permission, index) => (
+                  <div 
+                    key={index} 
+                    className="px-4 py-2 bg-gray-50 rounded-lg text-sm font-medium text-gray-800"
+                  >
+                    {permission.replace('_', ' ')}
+                  </div>
+                ))}
+              </div>
+              
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={closePermissionModal}
+                  className="px-4 py-2 bg-[#5D2A8B] text-white rounded-lg hover:bg-purple-700 transition-colors duration-200"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

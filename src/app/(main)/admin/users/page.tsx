@@ -18,12 +18,17 @@ import {
   Eye,
   Phone,
   Lock,
-  UserCheck
+  UserCheck,
+  Mail,
+  Key,
+  Archive,
+  UserX
 } from 'lucide-react';
 import UserActionModal from '@/app/components/userActionModal';
 import DeleteConfirmationModal from '@/app/components/DeleteConfirmationModal';
 import { useRouter } from 'next/navigation';
 import { AdminUserService, AdminUser } from '@/services/AdminUserService';
+import { HttpService } from '@/services/HttpService';
 
 interface User {
   id: string;
@@ -38,6 +43,7 @@ interface User {
   isVerified: boolean;
   status: 'pending' | 'active' | 'disabled' | 'archived';
   organizationId: string;
+  permissions: string[];
 }
 
 const UsersManagementPage = () => {
@@ -65,7 +71,7 @@ const UsersManagementPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
-  const [statusFilter, setStatusFilter] = useState<'pending' | 'active' | 'disabled' | 'archived'>('pending');
+  const [statusFilter, setStatusFilter] = useState<'pending' | 'active' | 'disabled' | 'archived' | 'all'>('all');
 
   // Refs for action buttons
   const actionButtonRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
@@ -79,7 +85,15 @@ const UsersManagementPage = () => {
     setLoading(true);
     try {
       const adminUserService = new AdminUserService();
-      const response = await adminUserService.getUsersByStatus(statusFilter, currentPage, 10);
+      let response;
+      
+      if (statusFilter === 'all') {
+        // Fetch all users regardless of status
+        response = await adminUserService.getAllUsers(currentPage, 10);
+      } else {
+        // Fetch users by status
+        response = await adminUserService.getUsersByStatus(statusFilter, currentPage, 10);
+      }
       
       // Transform API response to match existing User interface
       const transformedUsers: User[] = response.data.users.map(user => ({
@@ -94,7 +108,8 @@ const UsersManagementPage = () => {
         createdAt: user.createdAt,
         isVerified: user.isVerified,
         status: user.status,
-        organizationId: user.organizationId || user.id
+        organizationId: user.organizationId || user.id,
+        permissions: user.permissions || []
       }));
       
       setUsers(transformedUsers);
@@ -278,6 +293,165 @@ const UsersManagementPage = () => {
     router.push(`/admin/users/one-time-code/${userId}`);
   };
 
+  const handleSendEmail = async (userId: string) => {
+    try {
+      const httpService = new HttpService();
+      await httpService.postData<any>({
+        adminMessage: 'Hello!',
+        generateNewPassword: false
+      }, `/api/org-user/users/${userId}/send-email`);
+      
+      toast({ 
+        title: 'Email Sent', 
+        description: 'Email sent successfully',
+        variant: 'default'
+      });
+      
+      closeActionModal();
+    } catch (error: any) {
+      console.error('Error sending email:', error);
+      toast({ 
+        title: 'Error', 
+        description: error.message || 'Failed to send email',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleResetPassword = async (userId: string) => {
+    try {
+      const adminUserService = new AdminUserService();
+      await adminUserService.updateAdminUserPassword(userId, { generateNew: true });
+      
+      toast({ 
+      title: 'Password Reset', 
+      description: 'Password has been reset successfully',
+      variant: 'default'
+      });
+      
+      closeActionModal();
+    } catch (error: any) {
+      console.error('Error resetting password:', error);
+      toast({ 
+      title: 'Error', 
+      description: error.message || 'Failed to reset password',
+      variant: 'destructive'
+      });
+    }
+  };
+
+  const handleSetPending = async (userId: string) => {
+    try {
+      const adminUserService = new AdminUserService();
+      await adminUserService.updateAdminUserStatus(userId, { status: 'pending' });
+      
+      // Update the user status in the local state
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.id === userId ? { ...user, status: 'pending' } : user
+        )
+      );
+      
+      toast({ 
+      title: 'Success', 
+      description: 'User status updated to pending',
+      variant: 'default'
+      });
+      
+      closeActionModal();
+    } catch (error: any) {
+      console.error('Error setting user to pending:', error);
+      toast({ 
+      title: 'Error', 
+      description: error.message || 'Failed to set user to pending',
+      variant: 'destructive'
+      });
+    }
+  };
+
+  const handleArchiveUser = async (userId: string) => {
+    try {
+      const adminUserService = new AdminUserService();
+      await adminUserService.updateAdminUserStatus(userId, { status: 'archived' });
+      
+      // Update the user status in the local state
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.id === userId ? { ...user, status: 'archived' } : user
+        )
+      );
+      
+      toast({ 
+      title: 'Success', 
+      description: 'User archived successfully',
+      variant: 'default'
+      });
+      
+      closeActionModal();
+    } catch (error: any) {
+      console.error('Error archiving user:', error);
+      toast({ 
+      title: 'Error', 
+      description: error.message || 'Failed to archive user',
+      variant: 'destructive'
+      });
+    }
+  };
+
+  const handleSendWelcomeEmail = async (userId: string) => {
+    try {
+      const httpService = new HttpService();
+      await httpService.postData<any>({
+        adminMessage: 'Welcome!',
+        generateNewPassword: true
+      }, `/api/org-user/users/${userId}/send-email`);
+      
+      toast({ 
+        title: 'Welcome Email Sent', 
+        description: 'Welcome email sent successfully',
+        variant: 'default'
+      });
+      
+      closeActionModal();
+    } catch (error: any) {
+      console.error('Error sending welcome email:', error);
+      toast({ 
+        title: 'Error', 
+        description: error.message || 'Failed to send welcome email',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleSetActive = async (userId: string) => {
+    try {
+      const adminUserService = new AdminUserService();
+      await adminUserService.updateAdminUserStatus(userId, { status: 'active' });
+      
+      // Update the user status in the local state
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.id === userId ? { ...user, status: 'active' } : user
+        )
+      );
+      
+      toast({ 
+        title: 'Success', 
+        description: 'User activated successfully',
+        variant: 'default'
+      });
+      
+      closeActionModal();
+    } catch (error: any) {
+      console.error('Error activating user:', error);
+      toast({ 
+        title: 'Error', 
+        description: error.message || 'Failed to activate user',
+        variant: 'destructive'
+      });
+    }
+  };
+
   const handleDelete = (userId: string) => {
     handleDeleteUser(userId);
   };
@@ -354,6 +528,59 @@ const UsersManagementPage = () => {
     }
   };
 
+  // Handle assign permissions
+  const handleAssignPermissions = async (userId: string, permissions: string[]) => {
+    try {
+      const adminUserService = new AdminUserService();
+      await adminUserService.assignUserPermissions(userId, { permissions });
+      
+      // Update the user's permissions in the local state
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.id === userId ? { ...user, permissions } : user
+        )
+      );
+      
+      toast({ 
+        title: 'Success', 
+        description: 'Permissions assigned successfully',
+        variant: 'default'
+      });
+      
+      closeActionModal();
+    } catch (error: any) {
+      console.error('Error assigning permissions:', error);
+      toast({ 
+        title: 'Error', 
+        description: error.message || 'Failed to assign permissions',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  // Handle make super admin
+  const handleMakeSuperAdmin = async (userId: string) => {
+    try {
+      // Assign super admin permissions
+      await handleAssignPermissions(userId, ['super_admin', 'view_users', 'manage_users', 'manage_permissions']);
+      
+      toast({ 
+        title: 'Success', 
+        description: 'User promoted to Super Admin successfully',
+        variant: 'default'
+      });
+      
+      closeActionModal();
+    } catch (error: any) {
+      console.error('Error promoting user to Super Admin:', error);
+      toast({ 
+        title: 'Error', 
+        description: error.message || 'Failed to promote user to Super Admin',
+        variant: 'destructive'
+      });
+    }
+  };
+
   // Status badge component
   const StatusBadge = ({ status }: { status: 'pending' | 'active' | 'disabled' | 'archived' }) => {
     const statusStyles = {
@@ -377,63 +604,26 @@ const UsersManagementPage = () => {
     );
   };
 
-  // Status dropdown component
-  const StatusDropdown = ({ userId, currentStatus }: { userId: string, currentStatus: 'pending' | 'active' | 'disabled' | 'archived' }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const dropdownRef = useRef<HTMLDivElement>(null);
-
-    const statusOptions = [
-      { value: 'pending', label: 'Pending', color: 'yellow' },
-      { value: 'active', label: 'Active', color: 'green' },
-      { value: 'disabled', label: 'Disabled', color: 'red' },
-      { value: 'archived', label: 'Archived', color: 'gray' }
-    ];
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
+  // Status badge component (display only)
+  const StatusBadgeDisplay = ({ status }: { status: 'pending' | 'active' | 'disabled' | 'archived' }) => {
+    const statusStyles = {
+      pending: 'bg-yellow-100 text-yellow-800',
+      active: 'bg-green-100 text-green-800',
+      disabled: 'bg-red-100 text-red-800',
+      archived: 'bg-gray-100 text-gray-800'
     };
-
-    useEffect(() => {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-      };
-    }, []);
-
-    const handleStatusSelect = async (newStatus: 'pending' | 'active' | 'disabled' | 'archived') => {
-      await handleStatusChange(userId, newStatus);
-      setIsOpen(false);
+    
+    const statusLabels = {
+      pending: 'Pending',
+      active: 'Active',
+      disabled: 'Disabled',
+      archived: 'Archived'
     };
-
+    
     return (
-      <div className="relative" ref={dropdownRef}>
-        <button
-          className="flex items-center gap-1 px-2 py-1 rounded-md bg-gray-100 hover:bg-gray-200 text-xs"
-          onClick={() => setIsOpen(!isOpen)}
-        >
-          <StatusBadge status={currentStatus} />
-        </button>
-        
-        {isOpen && (
-          <div className="absolute z-10 mt-1 w-32 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5">
-            <div className="py-1">
-              {statusOptions.map((option) => (
-                <button
-                  key={option.value}
-                  className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                    currentStatus === option.value ? 'bg-gray-100 font-medium' : ''
-                  }`}
-                  onClick={() => handleStatusSelect(option.value as 'pending' | 'active' | 'disabled' | 'archived')}
-                >
-                  <StatusBadge status={option.value as any} />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusStyles[status]}`}>
+        {statusLabels[status]}
+      </span>
     );
   };
 
@@ -513,16 +703,29 @@ const UsersManagementPage = () => {
           {/* Status Filter */}
           <div className="mt-4 flex flex-wrap gap-2">
             <button
+              className={`px-4 py-2 rounded-lg ${statusFilter === 'pending' ? 'bg-[#5D2A8B] text-white' : 'bg-gray-200 text-gray-700'}`}
+              onClick={() => setStatusFilter('pending')}
+            >
+              Pending
+            </button>
+            <button
               className={`px-4 py-2 rounded-lg ${statusFilter === 'active' ? 'bg-[#5D2A8B] text-white' : 'bg-gray-200 text-gray-700'}`}
-              onClick={() => router.push('/admin/users/active')}
+              onClick={() => setStatusFilter('active')}
             >
               Active
             </button>
+           
             <button
               className={`px-4 py-2 rounded-lg ${statusFilter === 'archived' ? 'bg-[#5D2A8B] text-white' : 'bg-gray-200 text-gray-700'}`}
               onClick={() => setStatusFilter('archived')}
             >
               Archived
+            </button>
+            <button
+              className={`px-4 py-2 rounded-lg ${statusFilter === 'all' ? 'bg-[#5D2A8B] text-white' : 'bg-gray-200 text-gray-700'}`}
+              onClick={() => setStatusFilter('all')}
+            >
+              All Users
             </button>
           </div>
         </div>
@@ -551,12 +754,11 @@ const UsersManagementPage = () => {
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Phone Number
                       </th>
+                      
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Customer User ID
+                         User ID
                       </th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        User ID
-                      </th>
+                      
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
                       </th>
@@ -568,7 +770,7 @@ const UsersManagementPage = () => {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {filteredUsers.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-6 py-12 text-center">
+                        <td colSpan={9} className="px-6 py-12 text-center">
                           <div className="flex flex-col items-center justify-center text-gray-500">
                            
                             <p className="text-lg font-medium">No users found</p>
@@ -592,7 +794,7 @@ const UsersManagementPage = () => {
                             <div className="flex items-center gap-2">
                               {user.phoneNumber ? (
                                 <>
-                                 
+                                  <Phone className="w-4 h-4 text-gray-500" />
                                   <span className="text-sm text-gray-900">{user.phoneNumber}</span>
                                 </>
                               ) : (
@@ -600,14 +802,13 @@ const UsersManagementPage = () => {
                               )}
                             </div>
                           </td>
+                          
                           <td className="px-6 py-4">
                             <div className="text-sm font-medium text-gray-900">{user.customerUserId}</div>
                           </td>
+                          
                           <td className="px-6 py-4">
-                            <div className="text-sm text-gray-500">{user.id}</div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <StatusDropdown userId={user.id} currentStatus={user.status} />
+                            <StatusBadgeDisplay status={user.status} />
                           </td>
                           <td className="px-6 py-4 text-right">
                             <div className="flex items-center justify-end gap-2">
@@ -685,18 +886,25 @@ const UsersManagementPage = () => {
           onChangePassword={() => handleChangePassword(actionModal.userId!)}
           onGenerateCustomId={() => handleGenerateCustomId(actionModal.userId!)}
           onStatusChange={(newStatus: 'pending' | 'active' | 'disabled' | 'archived') => handleStatusChange(actionModal.userId!, newStatus)}
+          onSendEmail={() => handleSendEmail(actionModal.userId!)}
+          onResetPassword={() => handleResetPassword(actionModal.userId!)}
+          onSetPending={() => handleSetPending(actionModal.userId!)}
+          onArchiveUser={() => handleArchiveUser(actionModal.userId!)}
+          onSendWelcomeEmail={() => handleSendWelcomeEmail(actionModal.userId!)}
+          onSetActive={() => handleSetActive(actionModal.userId!)}
+         
           position={actionModal.position}
         />
       )}
       
       {/* Delete Confirmation Modal */}
-      <DeleteConfirmationModal
+      {/* <DeleteConfirmationModal
         isOpen={deleteModal.isOpen}
         onClose={() => setDeleteModal({ isOpen: false, userId: null, userName: '' })}
         onConfirm={confirmDeleteUser}
         itemName={deleteModal.userName}
         itemType="user"
-      />
+      /> */}
     </div>
   );
 };

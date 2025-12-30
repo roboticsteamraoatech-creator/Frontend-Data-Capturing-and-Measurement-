@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, User, Mail, Phone, Building2, MapPin, Calendar, CheckSquare } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, Building2, MapPin, Calendar, CheckSquare, Key, Users } from 'lucide-react';
 import { AdminUserService, UpdateUserPayload, AdminUser } from '@/services/AdminUserService';
+import { RoleService, Role } from '@/services/RoleService';
 import { toast } from '@/app/components/hooks/use-toast';
 
 const EditUserForm = () => {
@@ -23,6 +24,9 @@ const EditUserForm = () => {
   const [permissions, setPermissions] = useState<any[]>([]);
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
   const [permissionsLoading, setPermissionsLoading] = useState(false);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [selectedRole, setSelectedRole] = useState<string>('');
+  const [rolesLoading, setRolesLoading] = useState(false);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -55,11 +59,43 @@ const EditUserForm = () => {
         // Get user's current permissions
         try {
           const userPermissions = await adminUserService.getUserPermissions(id);
-          const userPermissionKeys = userPermissions.data.permissions.map((p: any) => p.key);
+          // Check if userPermissions.data has the permissions array directly or nested
+          let userPermissionKeys: string[] = [];
+          if (userPermissions.data.permissions) {
+            // If permissions is an array of objects with key property
+            if (Array.isArray(userPermissions.data.permissions) && userPermissions.data.permissions.length > 0) {
+              if (typeof userPermissions.data.permissions[0] === 'object' && userPermissions.data.permissions[0].key) {
+                userPermissionKeys = userPermissions.data.permissions.map((p: any) => p.key);
+              } else {
+                // If permissions is an array of strings
+                userPermissionKeys = userPermissions.data.permissions;
+              }
+            }
+          }
           setSelectedPermissions(userPermissionKeys);
         } catch (error) {
           console.error('Error fetching user permissions:', error);
           // Continue without permissions if there's an error
+        }
+        
+        // Fetch roles
+        try {
+          const roleService = new RoleService();
+          const rolesResponse = await roleService.getRoles();
+          setRoles(rolesResponse.data.roles || []);
+          
+          // After roles are loaded, try to match the user's role
+          // Get user role from the user data
+          if (userData.role) {
+            // Find the role ID that matches the user's role name
+            const userRole = rolesResponse.data.roles.find(role => role.name === userData.role);
+            if (userRole) {
+              setSelectedRole(userRole.id);
+            }
+          }
+        } catch (roleError) {
+          console.error('Error fetching roles:', roleError);
+          // Continue without roles if there's an error
         }
         
         setUserLoading(false);
@@ -179,6 +215,26 @@ const EditUserForm = () => {
         }
       }
       
+      // Update user role
+      // If a role is selected, assign it to the user
+      if (selectedRole) {
+        try {
+          const roleService = new RoleService();
+          // First, try to unassign any existing role (if we knew the previous role)
+          // For now, we'll just assign the new role
+          await roleService.assignRoleToUsers(selectedRole, { userIds: [userId] });
+        } catch (roleError) {
+          console.error('Error assigning role:', roleError);
+          toast({
+            title: 'Warning',
+            description: 'User updated successfully, but failed to assign role',
+            variant: 'destructive'
+          });
+        }
+      }
+      // Note: Removing a role might require a different API call depending on backend implementation
+      // If no role is selected (empty string), no role assignment is made
+      
       // Update password if provided
       if (formData.userID) {
         try {
@@ -246,7 +302,7 @@ const EditUserForm = () => {
             {/* Basic Information Section */}
             <div>
               <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                
+                <User className="w-5 h-5" />
                 Basic Information
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -287,7 +343,7 @@ const EditUserForm = () => {
             {/* Contact Information */}
             <div>
               <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                
+                <Mail className="w-5 h-5" />
                 Contact Information
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -322,35 +378,24 @@ const EditUserForm = () => {
               </div>
             </div>
 
-            {/* Permissions Assignment */}
+            {/* Role Assignment */}
             <div>
               <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <CheckSquare className="w-5 h-5" />
-                Assign Permissions
+                <Users className="w-5 h-5" />
+                Assign Role
               </h2>
               <div className="border border-gray-200 rounded-lg overflow-hidden">
-                {permissionsLoading ? (
-                  <div className="text-center py-8 text-gray-600">Loading permissions...</div>
-                ) : permissions.length === 0 ? (
-                  <div className="text-center py-8 text-gray-600">No permissions available</div>
+                {rolesLoading ? (
+                  <div className="text-center py-8 text-gray-600">Loading roles...</div>
+                ) : roles.length === 0 ? (
+                  <div className="text-center py-8 text-gray-600">No roles available</div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
-                            <input
-                              type="checkbox"
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedPermissions(permissions.map(p => p.key));
-                                } else {
-                                  setSelectedPermissions([]);
-                                }
-                              }}
-                              checked={selectedPermissions.length === permissions.length && permissions.length > 0}
-                              className="h-4 w-4 text-[#5D2A8B] rounded focus:ring-[#5D2A8B] border-gray-300"
-                            />
+                            Select
                           </th>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Name
@@ -359,33 +404,33 @@ const EditUserForm = () => {
                             Description
                           </th>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Permission
+                            Permissions
                           </th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {permissions.map((permission) => (
+                        {roles.map((role) => (
                           <tr 
-                            key={permission.key}
-                            className={`cursor-pointer ${selectedPermissions.includes(permission.key) ? 'bg-purple-50' : 'hover:bg-gray-50'}`}
-                            onClick={() => handlePermissionChange(permission.key)}
+                            key={role.id}
+                            className={`cursor-pointer ${selectedRole === role.id ? 'bg-purple-50' : 'hover:bg-gray-50'}`}
+                            onClick={() => setSelectedRole(selectedRole === role.id ? '' : role.id)}
                           >
                             <td className="px-6 py-4 whitespace-nowrap">
                               <input
-                                type="checkbox"
-                                checked={selectedPermissions.includes(permission.key)}
-                                onChange={() => {}}
-                                className="h-4 w-4 text-[#5D2A8B] rounded focus:ring-[#5D2A8B] border-gray-300"
+                                type="radio"
+                                checked={selectedRole === role.id}
+                                onChange={() => setSelectedRole(selectedRole === role.id ? '' : role.id)}
+                                className="h-4 w-4 text-[#5D2A8B] rounded-full focus:ring-[#5D2A8B] border-gray-300"
                               />
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {permission.name}
+                              {role.name}
                             </td>
                             <td className="px-6 py-4 text-sm text-gray-600">
-                              {permission.description}
+                              {role.description}
                             </td>
-                            <td className="px-6 py-4 text-sm text-gray-500 font-mono">
-                              {permission.key}
+                            <td className="px-6 py-4 text-sm text-gray-500">
+                              {role.permissions.join(', ')}
                             </td>
                           </tr>
                         ))}
@@ -399,7 +444,7 @@ const EditUserForm = () => {
             {/* User IDs Section */}
             <div>
               <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                
+                <Key className="w-5 h-5" />
                 User Identification
               </h2>
               <div className="space-y-4  border border-[#5D2A8B] rounded-lg p-6">
