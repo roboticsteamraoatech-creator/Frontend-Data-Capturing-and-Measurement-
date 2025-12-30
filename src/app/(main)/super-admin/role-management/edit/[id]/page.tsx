@@ -3,21 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Save, X } from 'lucide-react';
-
-interface Role {
-  id: string;
-  name: string;
-  description: string;
-  permissions: string[];
-  createdAt: string;
-  updatedAt: string;
-}
+import { RoleService, Role } from '@/services/RoleService';
+import { AdminUserService } from '@/services/AdminUserService';
+import { toast } from '@/app/components/hooks/use-toast';
 
 interface Permission {
-  id: string;
+  key: string;
   name: string;
   description: string;
-  category: string;
+  category?: string;
 }
 
 const EditRolePage = () => {
@@ -29,80 +23,62 @@ const EditRolePage = () => {
   const [roleName, setRoleName] = useState('');
   const [roleDescription, setRoleDescription] = useState('');
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [loadingPermissions, setLoadingPermissions] = useState(true);
 
-  // Mock permissions data
-  const permissions: Permission[] = [
-    // User Management
-    { id: 'create_user', name: 'Create User', description: 'Ability to create new users', category: 'User Management' },
-    { id: 'view_user', name: 'View User', description: 'Ability to view user details', category: 'User Management' },
-    { id: 'edit_user', name: 'Edit User', description: 'Ability to edit user information', category: 'User Management' },
-    { id: 'archive_user', name: 'Archive User', description: 'Ability to archive users', category: 'User Management' },
-    { id: 'enable_disable_user', name: 'Enable/Disable User', description: 'Ability to enable or disable users', category: 'User Management' },
-    
-    // Group Management
-    { id: 'create_group', name: 'Create Group', description: 'Ability to create new groups', category: 'Group Management' },
-    { id: 'view_group', name: 'View Group', description: 'Ability to view group details', category: 'Group Management' },
-    { id: 'edit_group', name: 'Edit Group', description: 'Ability to edit group information', category: 'Group Management' },
-    
-    // Role Management
-    { id: 'create_role', name: 'Create Role', description: 'Ability to create new roles', category: 'Role Management' },
-    { id: 'view_role', name: 'View Role', description: 'Ability to view role details', category: 'Role Management' },
-    { id: 'edit_role', name: 'Edit Role', description: 'Ability to edit role information', category: 'Role Management' },
-  ];
+  useEffect(() => {
+    fetchPermissionsAndRoleData();
+  }, [roleId]);
+
+  const fetchPermissionsAndRoleData = async () => {
+    try {
+      setLoading(true);
+      // Fetch permissions
+      const adminUserService = new AdminUserService();
+      const permissionsResponse = await adminUserService.getAvailablePermissions();
+      const permissionsData = permissionsResponse.data.permissions || [];
+      
+      // Transform the permission data to include category
+      const permissionsWithCategory = permissionsData.map((perm: any) => ({
+        key: perm.key,
+        name: perm.name,
+        description: perm.description,
+        category: perm.category || 'General', // Default to 'General' if no category
+      }));
+      
+      setPermissions(permissionsWithCategory);
+
+      // Fetch role data
+      const roleService = new RoleService();
+      const response = await roleService.getRoleById(roleId);
+      const fetchedRole = response.data.role;
+      
+      setRole(fetchedRole);
+      setRoleName(fetchedRole.name);
+      setRoleDescription(fetchedRole.description);
+      setSelectedPermissions(fetchedRole.permissions);
+    } catch (error: any) {
+      console.error('Error fetching permissions and role:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to fetch permissions and role data',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+      setLoadingPermissions(false);
+    }
+  };
 
   const groupedPermissions = permissions.reduce((acc, permission) => {
-    if (!acc[permission.category]) {
-      acc[permission.category] = [];
+    const category = permission.category || 'General'; // Use 'General' as default category
+    if (!acc[category]) {
+      acc[category] = [];
     }
-    acc[permission.category].push(permission);
+    acc[category].push(permission);
     return acc;
   }, {} as Record<string, Permission[]>);
-
-  // Load role data
-  useEffect(() => {
-    // In a real app, this would fetch from an API
-    const mockRoles: Role[] = [
-      { 
-        id: 'ROLE-001', 
-        name: 'Super Administrator', 
-        description: 'Full access to all system features and settings', 
-        permissions: [
-          'create_user', 'view_user', 'edit_user', 'archive_user', 'enable_disable_user',
-          'create_group', 'view_group', 'edit_group',
-          'create_role', 'view_role', 'edit_role'
-        ],
-        createdAt: '2023-01-15T10:30:00Z', 
-        updatedAt: '2023-01-15T10:30:00Z'
-      },
-      { 
-        id: 'ROLE-002', 
-        name: 'Administrator', 
-        description: 'Can manage users and organisations', 
-        permissions: [
-          'create_user', 'view_user', 'edit_user', 'archive_user', 'enable_disable_user',
-          'create_group', 'view_group', 'edit_group'
-        ],
-        createdAt: '2023-02-20T14:45:00Z', 
-        updatedAt: '2023-02-20T14:45:00Z'
-      },
-      { 
-        id: 'ROLE-003', 
-        name: 'Organisation Admin', 
-        description: 'Can manage organisation users and settings', 
-        permissions: ['create_user', 'view_user', 'edit_user'],
-        createdAt: '2023-03-10T09:15:00Z', 
-        updatedAt: '2023-03-10T09:15:00Z'
-      },
-    ];
-    
-    const foundRole = mockRoles.find(r => r.id === roleId);
-    if (foundRole) {
-      setRole(foundRole);
-      setRoleName(foundRole.name);
-      setRoleDescription(foundRole.description);
-      setSelectedPermissions(foundRole.permissions);
-    }
-  }, [roleId]);
 
   const handlePermissionToggle = (permissionId: string) => {
     setSelectedPermissions(prev => 
@@ -112,25 +88,39 @@ const EditRolePage = () => {
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!role) return;
     
-    // In a real app, this would send data to an API
-    const updatedRole = {
-      ...role,
-      name: roleName,
-      description: roleDescription,
-      permissions: selectedPermissions,
-      updatedAt: new Date().toISOString()
-    };
+    setLoading(true);
     
-    console.log('Updated role:', updatedRole);
-    
-    // Show success message and redirect
-    alert(`Role "${roleName}" updated successfully!`);
-    router.push('/super-admin/role-management');
+    try {
+      const roleService = new RoleService();
+      const roleData = {
+        name: roleName,
+        description: roleDescription,
+        permissions: selectedPermissions,
+      };
+      
+      await roleService.updateRole(roleId, roleData);
+      
+      toast({
+        title: 'Success',
+        description: `Role "${roleName}" updated successfully!`,
+      });
+      
+      router.push('/super-admin/role-management');
+    } catch (error: any) {
+      console.error('Error updating role:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update role',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!role) {
@@ -230,47 +220,53 @@ const EditRolePage = () => {
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Permissions</h2>
             <p className="text-gray-600 text-sm mb-6">Select the permissions to assign to this role</p>
             
-            <div className="space-y-8">
-              {Object.entries(groupedPermissions).map(([category, perms]) => (
-                <div key={category}>
-                  <h3 className="text-md font-medium text-gray-800 mb-4">{category}</h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {perms.map((permission) => (
-                      <div 
-                        key={permission.id}
-                        className={`border rounded-lg p-4 cursor-pointer transition-all duration-200 ${
-                          selectedPermissions.includes(permission.id)
-                            ? 'border-purple-500 bg-purple-50'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                        onClick={() => handlePermissionToggle(permission.id)}
-                      >
-                        <div className="flex items-start">
-                          <div className={`flex items-center h-5 mt-0.5 mr-3 ${
-                            selectedPermissions.includes(permission.id) 
-                              ? 'text-purple-600' 
-                              : 'text-gray-400'
-                          }`}>
-                            {selectedPermissions.includes(permission.id) ? (
-                              <div className="w-5 h-5 rounded-full bg-purple-600 flex items-center justify-center">
-                                <div className="w-2 h-2 rounded-full bg-white"></div>
-                              </div>
-                            ) : (
-                              <div className="w-5 h-5 rounded-full border-2 border-gray-300"></div>
-                            )}
-                          </div>
-                          <div>
-                            <div className="font-medium text-gray-900">{permission.name}</div>
-                            <div className="text-sm text-gray-500 mt-1">{permission.description}</div>
+            {loadingPermissions ? (
+              <div className="text-center py-8 text-gray-600">Loading permissions...</div>
+            ) : permissions.length === 0 ? (
+              <div className="text-center py-8 text-gray-600">No permissions available</div>
+            ) : (
+              <div className="space-y-8">
+                {Object.entries(groupedPermissions).map(([category, perms]) => (
+                  <div key={category}>
+                    <h3 className="text-md font-medium text-gray-800 mb-4">{category}</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {perms.map((permission) => (
+                        <div 
+                          key={permission.key}
+                          className={`border rounded-lg p-4 cursor-pointer transition-all duration-200 ${
+                            selectedPermissions.includes(permission.key)
+                              ? 'border-purple-500 bg-purple-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                          onClick={() => handlePermissionToggle(permission.key)}
+                        >
+                          <div className="flex items-start">
+                            <div className={`flex items-center h-5 mt-0.5 mr-3 ${
+                              selectedPermissions.includes(permission.key) 
+                                ? 'text-purple-600' 
+                                : 'text-gray-400'
+                            }`}>
+                              {selectedPermissions.includes(permission.key) ? (
+                                <div className="w-5 h-5 rounded-full bg-purple-600 flex items-center justify-center">
+                                  <div className="w-2 h-2 rounded-full bg-white"></div>
+                                </div>
+                              ) : (
+                                <div className="w-5 h-5 rounded-full border-2 border-gray-300"></div>
+                              )}
+                            </div>
+                            <div>
+                              <div className="font-medium text-gray-900">{permission.name}</div>
+                              <div className="text-sm text-gray-500 mt-1">{permission.description}</div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Selected Permissions Summary */}
@@ -282,7 +278,7 @@ const EditRolePage = () => {
             ) : (
               <div className="flex flex-wrap gap-2">
                 {selectedPermissions.map(permissionId => {
-                  const permission = permissions.find(p => p.id === permissionId);
+                  const permission = permissions.find(p => p.key === permissionId);
                   return permission ? (
                     <div 
                       key={permissionId}
@@ -315,10 +311,20 @@ const EditRolePage = () => {
             
             <button
               type="submit"
-              className="px-6 py-3 bg-[#5D2A8B] text-white rounded-lg hover:bg-purple-700 transition-colors duration-200 flex items-center gap-2"
+              disabled={loading}
+              className={`px-6 py-3 bg-[#5D2A8B] text-white rounded-lg hover:bg-purple-700 transition-colors duration-200 flex items-center gap-2 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              <Save className="w-5 h-5" />
-              Update Role
+              {loading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <Save className="w-5 h-5" />
+                  Update Role
+                </>
+              )}
             </button>
           </div>
         </form>

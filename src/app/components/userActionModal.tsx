@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Eye, Edit, Clock, Key, Trash2, UserCheck, UserX, Archive } from 'lucide-react';
+import { Eye, Edit, Clock, Key, Trash2, UserCheck, UserX, Archive, UserRoundCheck } from 'lucide-react';
 
 interface UserActionModalProps {
   isOpen: boolean;
@@ -13,8 +13,15 @@ interface UserActionModalProps {
   onOneTimeCode: () => void;
   onDelete: () => void;
   onChangePassword?: () => void;
-  onStatusChange?: (newStatus: 'pending' | 'active' | 'disabled' | 'archived') => void;
+  onStatusChange?: (newStatus: 'pending' | 'active'  | 'archived') => void;
   onGenerateCustomId?: () => void;
+  onSendEmail?: () => void;
+  onResetPassword?: () => void;
+  onSetPending?: () => void;
+  onArchiveUser?: () => void;
+  onSendWelcomeEmail?: () => void;
+  onSetActive?: () => void;
+ 
   position: { top: number; left: number };
 }
 
@@ -25,13 +32,20 @@ const UserActionModal: React.FC<UserActionModalProps> = ({
   onEditUser,
   onDelete,
   onStatusChange,
+  onSendEmail,
+  onResetPassword,
+  onSetPending,
+  onArchiveUser,
+  onSendWelcomeEmail,
+  onSetActive,
+
   position
 }) => {
   const [showStatusOptions, setShowStatusOptions] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleStatusChange = (newStatus: 'pending' | 'active' | 'disabled' | 'archived') => {
+  const handleStatusChange = (newStatus: 'pending' | 'active' | 'archived') => {
     if (onStatusChange) {
       onStatusChange(newStatus);
     }
@@ -62,7 +76,7 @@ const UserActionModal: React.FC<UserActionModalProps> = ({
               onClose();
             }}
           >
-            
+           
             View User
           </button>
           
@@ -74,15 +88,95 @@ const UserActionModal: React.FC<UserActionModalProps> = ({
               onClose();
             }}
           >
-            
+          
             Edit User
           </button>
           
-         
+          {/* {onSendEmail && (
+            <button 
+              className="manrope text-left p-3 rounded-lg hover:bg-gray-50 transition-colors text-base text-[#1A1A1A] flex items-center gap-3"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSendEmail();
+                onClose();
+              }}
+            >
+             
+              Send Email
+            </button>
+          )} */}
           
+          {onResetPassword && (
+            <button 
+              className="manrope text-left p-3 rounded-lg hover:bg-gray-50 transition-colors text-base text-[#1A1A1A] flex items-center gap-3"
+              onClick={(e) => {
+                e.stopPropagation();
+                onResetPassword();
+                onClose();
+              }}
+            >
+             
+              Reset Password
+            </button>
+          )}
           
+          {onSetPending && (
+            <button 
+              className="manrope text-left p-3 rounded-lg hover:bg-gray-50 transition-colors text-base text-[#1A1A1A] flex items-center gap-3"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSetPending();
+                onClose();
+              }}
+            >
+             
+              Set to Pending
+            </button>
+          )}
           
-          <button 
+          {onArchiveUser && (
+            <button 
+              className="manrope text-left p-3 rounded-lg hover:bg-gray-50 transition-colors text-base text-[#1A1A1A] flex items-center gap-3"
+              onClick={(e) => {
+                e.stopPropagation();
+                onArchiveUser();
+                onClose();
+              }}
+            >
+             
+              Archive User
+            </button>
+          )}
+          
+          {onSendWelcomeEmail && (
+            <button 
+              className="manrope text-left p-3 rounded-lg hover:bg-gray-50 transition-colors text-base text-[#1A1A1A] flex items-center gap-3"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSendWelcomeEmail();
+                onClose();
+              }}
+            >
+             
+              Send Email
+            </button>
+          )}
+          
+          {onSetActive && (
+            <button 
+              className="manrope text-left p-3 rounded-lg hover:bg-gray-50 transition-colors text-base text-[#1A1A1A] flex items-center gap-3"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSetActive();
+                onClose();
+              }}
+            >
+              <UserRoundCheck className="w-5 h-5" />
+              Active User
+            </button>
+          )}
+          
+          {/* <button 
             className="manrope text-left p-3 rounded-lg hover:bg-gray-50 transition-colors text-base text-[#FF6161] flex items-center gap-3"
             onClick={(e) => {
               e.stopPropagation();
@@ -92,7 +186,7 @@ const UserActionModal: React.FC<UserActionModalProps> = ({
           >
            
             Delete
-          </button>
+          </button> */}
         </div>
       </div>
 
@@ -132,12 +226,95 @@ const UserActionModal: React.FC<UserActionModalProps> = ({
               onClose();
             }}
           >
-            
+           
             Edit User
           </button>
-        
           
-          <button 
+          {/* {onSendEmail && (
+            <button 
+              className="manrope text-left hover:bg-gray-50 p-2 rounded transition-colors flex items-center gap-2 text-sm text-[#1A1A1A] w-full"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSendEmail();
+                onClose();
+              }}
+            >
+              
+              Send Email
+            </button>
+          )} */}
+          
+          {onResetPassword && (
+            <button 
+              className="manrope text-left hover:bg-gray-50 p-2 rounded transition-colors flex items-center gap-2 text-sm text-[#1A1A1A] w-full"
+              onClick={(e) => {
+                e.stopPropagation();
+                onResetPassword();
+                onClose();
+              }}
+            >
+              
+              Reset Password
+            </button>
+          )}
+          
+          {onSetPending && (
+            <button 
+              className="manrope text-left hover:bg-gray-50 p-2 rounded transition-colors flex items-center gap-2 text-sm text-[#1A1A1A] w-full"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSetPending();
+                onClose();
+              }}
+            >
+              
+              Set to Pending
+            </button>
+          )}
+          
+          {onArchiveUser && (
+            <button 
+              className="manrope text-left hover:bg-gray-50 p-2 rounded transition-colors flex items-center gap-2 text-sm text-[#1A1A1A] w-full"
+              onClick={(e) => {
+                e.stopPropagation();
+                onArchiveUser();
+                onClose();
+              }}
+            >
+              
+              Archive User
+            </button>
+          )}
+          
+          {onSendWelcomeEmail && (
+            <button 
+              className="manrope text-left hover:bg-gray-50 p-2 rounded transition-colors flex items-center gap-2 text-sm text-[#1A1A1A] w-full"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSendWelcomeEmail();
+                onClose();
+              }}
+            >
+              
+              Send Email
+            </button>
+          )}
+          
+          {onSetActive && (
+            <button 
+              className="manrope text-left hover:bg-gray-50 p-2 rounded transition-colors flex items-center gap-2 text-sm text-[#1A1A1A] w-full"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSetActive();
+                onClose();
+              }}
+            >
+              <UserRoundCheck className="w-4 h-4" />
+              Active User
+            </button>
+          )}
+          
+          {/* <button 
             className="manrope text-left hover:bg-gray-50 p-2 rounded transition-colors flex items-center gap-2 text-sm text-[#FF6161] w-full"
             onClick={(e) => {
               e.stopPropagation();
@@ -145,9 +322,9 @@ const UserActionModal: React.FC<UserActionModalProps> = ({
               onClose();
             }}
           >
-          
+            
             Delete
-          </button>
+          </button> */}
         </div>
       </div>
     </>

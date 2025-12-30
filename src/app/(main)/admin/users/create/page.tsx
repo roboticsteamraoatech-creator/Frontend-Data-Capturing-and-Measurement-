@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, User, Mail, Phone, Building2, MapPin, Calendar, CheckSquare } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, Building2, MapPin, Calendar, Users } from 'lucide-react';
 import { AdminUserService, CreateUserPayload, CreateUserResponse } from '@/services/AdminUserService';
+import { RoleService, Role } from '@/services/RoleService';
 import { toast } from '@/app/components/hooks/use-toast';
 
 const CreateUserForm = () => {
@@ -18,30 +19,30 @@ const CreateUserForm = () => {
     organisationsCustomUsersID: ''
   });
   const [loading, setLoading] = useState(false);
-  const [permissions, setPermissions] = useState<any[]>([]);
-  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
-  const [permissionsLoading, setPermissionsLoading] = useState(false);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [selectedRole, setSelectedRole] = useState<string>('');
+  const [rolesLoading, setRolesLoading] = useState(false);
 
   useEffect(() => {
-    const fetchPermissions = async () => {
-      setPermissionsLoading(true);
+    const fetchRoles = async () => {
+      setRolesLoading(true);
       try {
-        const adminUserService = new AdminUserService();
-        const response = await adminUserService.getAvailablePermissions();
-        setPermissions(response.data.permissions || []);
+        const roleService = new RoleService();
+        const response = await roleService.getRoles();
+        setRoles(response.data.roles || []);
       } catch (error) {
-        console.error('Error fetching permissions:', error);
+        console.error('Error fetching roles:', error);
         toast({
           title: 'Error',
-          description: 'Failed to load permissions',
+          description: 'Failed to load roles',
           variant: 'destructive'
         });
       } finally {
-        setPermissionsLoading(false);
+        setRolesLoading(false);
       }
     };
 
-    fetchPermissions();
+    fetchRoles();
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -52,13 +53,7 @@ const CreateUserForm = () => {
     }));
   };
 
-  const handlePermissionChange = (permissionKey: string) => {
-    setSelectedPermissions(prev =>
-      prev.includes(permissionKey)
-        ? prev.filter(p => p !== permissionKey)
-        : [...prev, permissionKey]
-    );
-  };
+
 
   const generatePassword = () => {
     // Generate a random password with letters, numbers, and special characters
@@ -134,15 +129,16 @@ const CreateUserForm = () => {
       // Call the API to create the user
       const response: CreateUserResponse = await adminUserService.createAdminUser(payload);
       
-      // If permissions were selected, assign them to the user
-      if (selectedPermissions.length > 0 && response?.data?.user?.id) {
+      // If a role was selected, assign it to the user
+      if (selectedRole && response?.data?.user?.id) {
         try {
-          await adminUserService.assignUserPermissions(response.data.user.id, { permissions: selectedPermissions });
-        } catch (permissionError) {
-          console.error('Error assigning permissions:', permissionError);
+          const roleService = new RoleService();
+          await roleService.assignRoleToUsers(selectedRole, { userIds: [response.data.user.id] });
+        } catch (roleError) {
+          console.error('Error assigning role:', roleError);
           toast({
             title: 'Warning',
-            description: 'User created successfully, but failed to assign permissions',
+            description: 'User created successfully, but failed to assign role',
             variant: 'destructive'
           });
         }
@@ -295,35 +291,24 @@ const CreateUserForm = () => {
               </div>
             </div>
 
-            {/* Permissions Assignment */}
+            {/* Role Assignment */}
             <div>
               <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <CheckSquare className="w-5 h-5" />
-                Assign Permissions
+                <Users className="w-5 h-5" />
+                Assign Role
               </h2>
               <div className="border border-gray-200 rounded-lg overflow-hidden">
-                {permissionsLoading ? (
-                  <div className="text-center py-8 text-gray-600">Loading permissions...</div>
-                ) : permissions.length === 0 ? (
-                  <div className="text-center py-8 text-gray-600">No permissions available</div>
+                {rolesLoading ? (
+                  <div className="text-center py-8 text-gray-600">Loading roles...</div>
+                ) : roles.length === 0 ? (
+                  <div className="text-center py-8 text-gray-600">No roles available</div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
-                            <input
-                              type="checkbox"
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedPermissions(permissions.map(p => p.key));
-                                } else {
-                                  setSelectedPermissions([]);
-                                }
-                              }}
-                              checked={selectedPermissions.length === permissions.length && permissions.length > 0}
-                              className="h-4 w-4 text-[#5D2A8B] rounded focus:ring-[#5D2A8B] border-gray-300"
-                            />
+                            Select
                           </th>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Name
@@ -332,33 +317,33 @@ const CreateUserForm = () => {
                             Description
                           </th>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Permission
+                            Permissions
                           </th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {permissions.map((permission) => (
+                        {roles.map((role) => (
                           <tr 
-                            key={permission.key}
-                            className={`cursor-pointer ${selectedPermissions.includes(permission.key) ? 'bg-purple-50' : 'hover:bg-gray-50'}`}
-                            onClick={() => handlePermissionChange(permission.key)}
+                            key={role.id}
+                            className={`cursor-pointer ${selectedRole === role.id ? 'bg-purple-50' : 'hover:bg-gray-50'}`}
+                            onClick={() => setSelectedRole(selectedRole === role.id ? '' : role.id)}
                           >
                             <td className="px-6 py-4 whitespace-nowrap">
                               <input
-                                type="checkbox"
-                                checked={selectedPermissions.includes(permission.key)}
-                                onChange={() => {}}
-                                className="h-4 w-4 text-[#5D2A8B] rounded focus:ring-[#5D2A8B] border-gray-300"
+                                type="radio"
+                                checked={selectedRole === role.id}
+                                onChange={() => setSelectedRole(selectedRole === role.id ? '' : role.id)}
+                                className="h-4 w-4 text-[#5D2A8B] rounded-full focus:ring-[#5D2A8B] border-gray-300"
                               />
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {permission.name}
+                              {role.name}
                             </td>
                             <td className="px-6 py-4 text-sm text-gray-600">
-                              {permission.description}
+                              {role.description}
                             </td>
-                            <td className="px-6 py-4 text-sm text-gray-500 font-mono">
-                              {permission.key}
+                            <td className="px-6 py-4 text-sm text-gray-500">
+                              {role.permissions.join(', ')}
                             </td>
                           </tr>
                         ))}

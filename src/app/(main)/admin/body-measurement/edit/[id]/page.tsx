@@ -96,10 +96,10 @@ export default function AdminBodyMeasurementEdit({ params }: { params: Promise<{
       try {
         const { id } = await params;
         const measurementService = new AdminMeasurementService();
-        const response = await measurementService.getMeasurements(1, 1, id);
+        const response = await measurementService.getAdminMeasurementById(id);
         
-        if (response.data.measurements.length > 0) {
-          const measurementData = response.data.measurements[0];
+        if (response.data.measurement) {
+          const measurementData = response.data.measurement;
           setMeasurement(measurementData);
           
           // Transform measurement data to form values

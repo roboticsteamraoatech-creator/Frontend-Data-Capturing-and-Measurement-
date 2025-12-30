@@ -1,6 +1,6 @@
 export const routes = {
   // User profile routes
-  getUserProfile: () => '/api/user/profile',
+  getUserProfile: () => '/api/auth/profile',
   updateUserProfile: () => '/api/user/profile',
   
   // Manual measurement routes
@@ -34,6 +34,26 @@ export const routes = {
   getUserPermissions: (userId: string) => `/api/admin/users/${userId}/permissions`,
   deleteAdminUser: (userId: string) => `/api/admin/users/${userId}`,
   
+  // Admin role management routes
+  createRole: () => '/api/admin/roles',
+  getRoles: () => '/api/admin/roles',
+  getRoleById: (roleId: string) => `/api/admin/roles/${roleId}`,
+  updateRole: (roleId: string) => `/api/admin/roles/${roleId}`,
+  deleteRole: (roleId: string) => `/api/admin/roles/${roleId}`,
+  assignRoleToUsers: (roleId: string) => `/api/admin/roles/${roleId}/assign`,
+  unassignRoleFromUsers: (roleId: string) => `/api/admin/roles/${roleId}/unassign`,
+  getUsersByRole: (roleId: string) => `/api/admin/roles/${roleId}/users`,
+  getRolesWithPagination: (page: number = 1, limit: number = 10) => `/api/admin/roles?page=${page}&limit=${limit}`,
+  
+  // Admin group management routes
+  createGroup: () => '/api/admin/groups',
+  getGroups: () => '/api/admin/groups',
+  getGroupById: (groupId: string) => `/api/admin/groups/${groupId}`,
+  updateGroup: (groupId: string) => `/api/admin/groups/${groupId}`,
+  deleteGroup: (groupId: string) => `/api/admin/groups/${groupId}`,
+  manageGroupMembers: (groupId: string) => `/api/admin/groups/${groupId}/members`,
+  getGroupsWithPagination: (page: number = 1, limit: number = 10) => `/api/admin/groups?page=${page}&limit=${limit}`,
+  
   // Admin measurements routes
   getAdminMeasurements: (page: number = 1, limit: number = 10, userId?: string) => {
     let url = `/api/admin/measurements?page=${page}&limit=${limit}`;
@@ -43,6 +63,7 @@ export const routes = {
     return url;
   },
   createAdminMeasurement: () => '/api/admin/measurements',
+  getAdminMeasurementById: (measurementId: string) => `/api/admin/measurements/${measurementId}`,
   updateAdminMeasurement: (measurementId: string) => `/api/admin/measurements/${measurementId}`,
   deleteAdminMeasurement: (measurementId: string) => `/api/admin/measurements/${measurementId}`,
   

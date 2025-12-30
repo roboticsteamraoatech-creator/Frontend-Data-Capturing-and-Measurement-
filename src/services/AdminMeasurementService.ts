@@ -117,4 +117,9 @@ export class AdminMeasurementService {
   async getDashboardStats(): Promise<DashboardStats> {
     return this.httpService.getData<DashboardStats>(routes.getAdminDashboardStats());
   }
+
+  // Get a single admin measurement by ID
+  async getAdminMeasurementById(measurementId: string): Promise<{ success: boolean; data: { measurement: Measurement }; message: string }> {
+    return this.httpService.getData<{ success: boolean; data: { measurement: Measurement }; message: string }>(routes.getAdminMeasurementById(measurementId));
+  }
 }
