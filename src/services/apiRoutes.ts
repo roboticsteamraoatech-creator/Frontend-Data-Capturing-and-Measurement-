@@ -73,6 +73,9 @@ export const routes = {
   // One-time codes routes
   generateOneTimeCode: () => '/api/admin/one-time-codes',
   getOneTimeCodes: (page: number = 1, limit: number = 10) => `/api/admin/one-time-codes?page=${page}&limit=${limit}`,
+  sendOneTimeCodeEmail: () => '/api/admin/one-time-codes/send-email',
+  validateCode: () => '/api/admin/external/validate-code',
+  submitExternalMeasurement: () => '/api/admin/external/measurements',
   
   // Subscription management routes
   getSubscriptionPackages: (page: number = 1, limit: number = 10, search?: string, sortBy?: string, sortOrder?: 'asc' | 'desc', status?: 'active' | 'inactive') => {

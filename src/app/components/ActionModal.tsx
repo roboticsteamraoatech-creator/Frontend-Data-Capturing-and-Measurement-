@@ -8,6 +8,7 @@ interface ActionModalProps {
   onViewMeasurement: () => void;
   onEditMeasurement: () => void;
   onDelete: () => void;
+  onCopyMeasurement?: () => void;
   position: { top: number; left: number };
 }
 
@@ -17,6 +18,7 @@ const ActionModal: React.FC<ActionModalProps> = ({
   onViewMeasurement,
   onEditMeasurement,
   onDelete,
+  onCopyMeasurement,
   position
 }) => {
   if (!isOpen) return null;
@@ -63,6 +65,19 @@ const ActionModal: React.FC<ActionModalProps> = ({
           >
             Edit Measurement
           </button>
+          
+          {onCopyMeasurement && (
+            <button 
+              className="manrope text-left p-3 rounded-lg hover:bg-gray-50 transition-colors text-base text-[#1A1A1A]"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCopyMeasurement();
+                onClose();
+              }}
+            >
+              Copy Measurement
+            </button>
+          )}
           
           {/* <button 
             className="manrope text-left p-3 rounded-lg hover:bg-gray-50 transition-colors text-base text-[#1A1A1A]"
@@ -137,7 +152,27 @@ const ActionModal: React.FC<ActionModalProps> = ({
           >
             Edit Measurement
           </button>
-          
+                    
+          {onCopyMeasurement && (
+            <button 
+              className="manrope text-left hover:bg-gray-50 p-2 rounded transition-colors"
+              style={{
+                fontSize: '14px',
+                color: '#1A1A1A',
+                border: 'none',
+                background: 'none',
+                width: '100%'
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onCopyMeasurement();
+                onClose();
+              }}
+            >
+              Copy Measurement
+            </button>
+          )}
+                    
           <button 
             className="manrope text-left hover:bg-gray-50 p-2 rounded transition-colors"
             style={{
