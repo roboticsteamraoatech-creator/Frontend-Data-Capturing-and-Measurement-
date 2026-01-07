@@ -81,7 +81,8 @@ const BodyMeasurementPage = () => {
     latestMeasurement.sections?.forEach((section: MeasurementSection) => {
       section.measurements?.forEach((m: ApiMeasurementData) => {
         const partName = m.bodyPartName?.toLowerCase() || section.sectionName?.toLowerCase() || 'Unknown';
-        const value = `${m.size} cm`;
+        const size = typeof m.size === 'string' ? parseFloat(m.size) : m.size;
+        const value = isNaN(size) ? '--' : `${size.toFixed(2)} cm`;
         
         // Check for common body parts and add them to summary
         if (partName?.includes('chest')) {
@@ -423,6 +424,32 @@ const BodyMeasurementPage = () => {
     return '--';
   };
 
+  // Get individual body part measurements from all sections
+  const getBodyPartMeasurement = (item: Measurement, bodyPartName: string): string => {
+    let measurement: ApiMeasurementData | undefined;
+    
+    // Search through all sections for the specific body part
+    item.sections?.forEach((section: MeasurementSection) => {
+      const found = section.measurements?.find((m: ApiMeasurementData) => 
+        m.bodyPartName?.toLowerCase() === bodyPartName.toLowerCase()
+      );
+      if (found) {
+        measurement = found;
+      }
+    });
+    
+    if (measurement && measurement.size !== undefined && measurement.size !== null) {
+      const size = typeof measurement.size === 'string' ? parseFloat(measurement.size) : measurement.size;
+      return isNaN(size) ? '--' : size.toFixed(2);
+    }
+    return '--';
+  };
+
+  // Define the body parts we want to display as columns
+  const bodyPartColumns = [
+    'Shoulder', 'Bust', 'Arm Length', 'Neck', 'Butt', 'Waist', 'Hips', 'Wrist', 'Inseam', 'Chest'
+  ];
+
   return (
     <div className="min-h-screen bg-white md:bg-gray-50">
       <style jsx>{`
@@ -466,8 +493,16 @@ const BodyMeasurementPage = () => {
               <span className="manrope text-xs text-gray-600 mt-0.5">Hips</span>
             </div>
             <div className="flex flex-col items-center p-2 flex-shrink-0 w-1/4 min-w-[80px]">
-              <span className="manrope font-semibold text-gray-800">{getMeasurementValue('Legs')}</span>
-              <span className="manrope text-xs text-gray-600 mt-0.5">Legs</span>
+              <span className="manrope font-semibold text-gray-800">{getMeasurementValue('Shoulder')}</span>
+              <span className="manrope text-xs text-gray-600 mt-0.5">Shoulder</span>
+            </div>
+            <div className="flex flex-col items-center p-2 flex-shrink-0 w-1/4 min-w-[80px]">
+              <span className="manrope font-semibold text-gray-800">{getMeasurementValue('Bust')}</span>
+              <span className="manrope text-xs text-gray-600 mt-0.5">Bust</span>
+            </div>
+            <div className="flex flex-col items-center p-2 flex-shrink-0 w-1/4 min-w-[80px]">
+              <span className="manrope font-semibold text-gray-800">{getMeasurementValue('Neck')}</span>
+              <span className="manrope text-xs text-gray-600 mt-0.5">Neck</span>
             </div>
             
           </div>
@@ -590,11 +625,11 @@ const BodyMeasurementPage = () => {
                   <thead>
                     <tr className="bg-gray-50">
                       <th className="manrope text-left px-6 py-4 text-sm font-medium text-gray-500">Name</th>
-                      <th className="manrope text-left px-6 py-4 text-sm font-medium text-gray-500">Measurement Type</th>
-                      {/* Dynamic section headers */}
-                      {getUniqueSectionNames().slice(0, 4).map((sectionName, index) => (
+                      <th className="manrope text-left px-6 py-4 text-sm font-medium text-gray-500">Type</th>
+                      {/* Individual body part columns */}
+                      {bodyPartColumns.slice(0, 6).map((bodyPart, index) => (
                         <th key={index} className="manrope text-left px-6 py-4 text-sm font-medium text-gray-500">
-                          {sectionName}
+                          {bodyPart} (cm)
                         </th>
                       ))}
                       <th className="manrope text-left px-6 py-4 text-sm font-medium text-gray-500">Actions</th>
@@ -611,10 +646,10 @@ const BodyMeasurementPage = () => {
                         <td className="manrope px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {measurement.measurementType}
                         </td>
-                        {/* Dynamic section measurements */}
-                        {getUniqueSectionNames().slice(0, 4).map((sectionName, secIndex) => (
-                          <td key={secIndex} className="manrope px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {getMeasurementsForSection(measurement, sectionName)}
+                        {/* Individual body part measurements */}
+                        {bodyPartColumns.slice(0, 6).map((bodyPart, bodyIndex) => (
+                          <td key={bodyIndex} className="manrope px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                            {getBodyPartMeasurement(measurement, bodyPart)}
                           </td>
                         ))}
                         <td className="manrope px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -652,11 +687,11 @@ const BodyMeasurementPage = () => {
                       </div>
                       
                       <div className="mt-3 grid grid-cols-2 gap-2">
-                        {getUniqueSectionNames().slice(0, 4).map((sectionName, secIndex) => (
-                          <div key={secIndex} className="flex justify-between items-center">
-                            <span className="manrope text-sm text-gray-500">{sectionName}:</span>
+                        {bodyPartColumns.slice(0, 6).map((bodyPart, bodyIndex) => (
+                          <div key={bodyIndex} className="flex justify-between items-center">
+                            <span className="manrope text-sm text-gray-500">{bodyPart}:</span>
                             <span className="manrope text-sm font-medium text-gray-900">
-                              {getMeasurementsForSection(measurement, sectionName)}
+                              {getBodyPartMeasurement(measurement, bodyPart)} cm
                             </span>
                           </div>
                         ))}

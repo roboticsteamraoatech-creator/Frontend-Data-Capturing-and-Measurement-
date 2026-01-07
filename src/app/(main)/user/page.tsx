@@ -1827,9 +1827,9 @@ const Page = () => {
               <span className="manrope text-sm md:text-base font-normal leading-tight" style={{ color: '#6E6E6EB2' }}>
                 Manual Measurements
               </span>
-              <span className="manrope text-2xl font-medium leading-tight text-[#1A1A1A]">
+              {/* <span className="manrope text-2xl font-medium leading-tight text-[#1A1A1A]">
                 {getCountByType('Manual')}
-              </span>
+              </span> */}
             </div>
 
             {/* Card Image */}
