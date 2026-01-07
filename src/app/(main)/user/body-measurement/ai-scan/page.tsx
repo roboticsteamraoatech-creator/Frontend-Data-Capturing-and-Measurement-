@@ -508,7 +508,7 @@ function AiBodyMeasurementContent() {
                         {key.replace(/([A-Z])/g, ' $1').trim()}
                       </span>
                       <span className="font-medium">
-                        {typeof value === 'number' ? `${value} cm` : value}
+                        {typeof value === 'number' ? `${value.toFixed(2)} cm` : value}
                       </span>
                     </div>
                   ))}
