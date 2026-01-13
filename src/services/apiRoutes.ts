@@ -147,5 +147,21 @@ export const routes = {
   updateVerifiedSubscription: (id: string) => `/api/super-admin/verified-subscriptions/${id}`,
   deleteVerifiedSubscription: (id: string) => `/api/super-admin/verified-subscriptions/${id}`,
   
+  // City region management routes
+  getCityRegions: (page: number = 1, limit: number = 10, search?: string, sortBy?: string, sortOrder?: 'asc' | 'desc', status?: 'active' | 'inactive') => {
+    let url = `/api/super-admin/city-regions?page=${page}&limit=${limit}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (sortBy) url += `&sortBy=${sortBy}`;
+    if (sortOrder) url += `&sortOrder=${sortOrder}`;
+    if (status) url += `&status=${status}`;
+    return url;
+  },
+  getCityRegionById: (id: string) => `/api/super-admin/city-regions/${id}`,
+  createCityRegion: () => '/api/super-admin/city-regions',
+  updateCityRegion: (id: string) => `/api/super-admin/city-regions/${id}`,
+  deleteCityRegion: (id: string) => `/api/super-admin/city-regions/${id}`,
+  updateCityRegionStatus: (id: string) => `/api/super-admin/city-regions/${id}/status`,
+  exportCityRegions: (format: 'csv' | 'excel' | 'pdf') => `/api/super-admin/city-regions/export/${format}`,
+  
   scanMeasurements: () => '/api/measurements/scan'
 };

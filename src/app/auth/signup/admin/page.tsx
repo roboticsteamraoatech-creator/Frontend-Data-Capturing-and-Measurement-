@@ -1076,6 +1076,7 @@ export default function OrganizationSignupPage() {
                   )}
                   {errors.phone && <p className="error-message">{errors.phone}</p>}
                 </div>
+                
 
                 {/* Organization Name */}
                 <div className={`input-container desktop-input-container ${errors.organizationName ? 'error' : ''}`}>
@@ -1116,7 +1117,20 @@ export default function OrganizationSignupPage() {
                   )}
                   {errors.country && <p className="error-message">{errors.country}</p>}
                 </div>
-
+                    <div className={`input-container desktop-input-container ${errors.organizationName ? 'error' : ''}`}>
+                  <input
+                    type="text"
+                    name="preferred url"
+                    value={formValues.organizationName}
+                    onChange={handleChange}
+                    placeholder="Your Organization"
+                    className={`input-field desktop-input-field ${formValues.organizationName ? 'has-value' : ''}`}
+                  />
+                  {formValues.organizationName && (
+                    <label className="input-label desktop-input-label">Preferred url</label>
+                  )}
+                  {errors.organizationName && <p className="error-message">{errors.organizationName}</p>}
+                </div>
                 {/* Password */}
                 <div className={`input-container desktop-input-container ${errors.password ? 'error' : ''}`}>
                   <input
