@@ -128,22 +128,29 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ onShow, setShow }) => {
       route: '/admin/questionaire', 
       icon: <Image src="/List Dropdown Streamline Carbon.png" alt="Questionnaire" width={24} height={24} className="object-contain" />,
     },
+     { 
+      id: 'group-management', 
+      name: 'Group Management', 
+      route: '/admin/group-management', 
+      icon: <Image src="/List Dropdown Streamline Carbon.png" alt="Questionnaire" width={24} height={24} className="object-contain" />,
+    },
     { 
       id: 'subscription', 
       name: 'Subscription', 
+      route: "/admin/subscription",
       icon: <Image src="/List Dropdown Streamline Carbon.png" alt="Subscription" width={24} height={24} className="object-contain" />,
-      subItems: [
-        {
-          id: 'package-subscription',
-          name: 'Package Subscription',
-          route: '/admin/subscription/package-subscription'
-        },
-        {
-          id: 'verified-badge-subscription',
-          name: 'Verified Badge Subscription',
-          route: '/admin/subscription/verified-badge-subscription'
-        }
-      ]
+      // subItems: [
+      //   {
+      //     id: 'package-subscription',
+      //     name: 'Package Subscription',
+      //     route: '/admin/subscription/package-subscription'
+      //   },
+      //   {
+      //     id: 'verified-badge-subscription',
+      //     name: 'Verified Badge Subscription',
+      //     route: '/admin/subscription/verified-badge-subscription'
+      //   }
+      // ]
     },
     {
       id: 'users', 
