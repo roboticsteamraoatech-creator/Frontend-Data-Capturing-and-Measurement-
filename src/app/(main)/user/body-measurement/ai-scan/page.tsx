@@ -158,24 +158,10 @@ function AiBodyMeasurementContent() {
     reset(); // Clear any previous errors/results
     
     try {
-      // Convert base64 image to the format expected by the API
-      let frontImageData = capturedImage;
-      // Ensure we have the full data URL format for the API
-      if (!frontImageData.startsWith('data:image')) {
-        frontImageData = `data:image/jpeg;base64,${frontImageData}`;
-      }
-      
-      let sideImageData = undefined;
-      if (sideImage) {
-        sideImageData = sideImage;
-        if (!sideImageData.startsWith('data:image')) {
-          sideImageData = `data:image/jpeg;base64,${sideImageData}`;
-        }
-      }
-      
+      // The captured images are already in data URL format, so we can pass them directly
       const requestData = {
-        frontImageData: frontImageData,
-        sideImageData: sideImageData,
+        frontImageData: capturedImage,
+        sideImageData: sideImage || undefined,
         userHeight: parseFloat(height),
         scanTimestamp: new Date().toISOString(),
         firstName: formData.firstName,
@@ -545,7 +531,16 @@ function AiBodyMeasurementContent() {
         
         <div className="mt-4 text-center">
           <button
-            onClick={() => router.back()}
+            onClick={() => {
+              // Reset state when going back
+              setStep('capture');
+              setCapturedImage(null);
+              setSideImage(null);
+              setHeight('');
+              setCurrentImageType('front');
+              reset();
+              router.back();
+            }}
             className="text-gray-500 hover:text-gray-700 text-sm"
           >
             Back to Measurements
