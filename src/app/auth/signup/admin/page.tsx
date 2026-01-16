@@ -64,16 +64,26 @@ export default function OrganizationSignupPage() {
 
   const { mutate: submitMutate, isPending } = useMutation({
     mutationFn: async (values: { name: string; email: string; phone: string; password: string; organizationName: string; country: string }) => {
-      // Split the name into firstName and lastName
-      const nameParts = values.name.trim().split(' ');
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
+      // Use the full name as provided
+      const firstName = '';
+      const lastName = '';
+      
+      // Normalize phone number
+      let normalizedPhone = values.phone.replace(/\s/g, '').replace(/[()-]/g, '');
+      
+      if (normalizedPhone.startsWith('0')) {
+        normalizedPhone = '+234' + normalizedPhone.substring(1);
+      }
+      
+      if (!normalizedPhone.startsWith('+') && normalizedPhone.length === 10) {
+        normalizedPhone = '+234' + normalizedPhone;
+      }
       
       const payload = {
-        fullName: `${firstName} ${lastName}`.trim(),
+        fullName: values.name,
         email: values.email.toLowerCase().trim(),
         password: values.password,
-        phoneNumber: values.phone.replace(/\s/g, ''),
+        phoneNumber: normalizedPhone,
         organizationName: values.organizationName,
         country: values.country,
         role: "ORGANIZATION"
@@ -1116,20 +1126,6 @@ export default function OrganizationSignupPage() {
                     <label className="input-label desktop-input-label">Country</label>
                   )}
                   {errors.country && <p className="error-message">{errors.country}</p>}
-                </div>
-                    <div className={`input-container desktop-input-container ${errors.organizationName ? 'error' : ''}`}>
-                  <input
-                    type="text"
-                    name="preferred url"
-                    value={formValues.organizationName}
-                    onChange={handleChange}
-                    placeholder="Your Organization"
-                    className={`input-field desktop-input-field ${formValues.organizationName ? 'has-value' : ''}`}
-                  />
-                  {formValues.organizationName && (
-                    <label className="input-label desktop-input-label">Preferred url</label>
-                  )}
-                  {errors.organizationName && <p className="error-message">{errors.organizationName}</p>}
                 </div>
                 {/* Password */}
                 <div className={`input-container desktop-input-container ${errors.password ? 'error' : ''}`}>
