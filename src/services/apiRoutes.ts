@@ -87,6 +87,13 @@ deleteSubscriptionPackage: (id: string) => `/api/subscription-packages/${id}`,
 updateSubscriptionStatus: (id: string) => `/api/subscription-packages/${id}/status`,
 exportSubscriptionPackages: (format: 'csv' | 'excel' | 'pdf') => `/api/subscription-packages/export/${format}`,
 
+// Service management routes
+createService: () => '/api/services',
+getServices: () => '/api/services',
+getServiceById: (id: string) => `/api/services/${id}`,
+updateService: (id: string) => `/api/services/${id}`,
+deleteService: (id: string) => `/api/services/${id}`,
+
   // Super Admin dashboard routes
   getSuperAdminDashboardStats: () => '/api/super-admin/dashboard/stats',
   getSuperAdminDashboardAnalytics: () => '/api/super-admin/dashboard/analytics',

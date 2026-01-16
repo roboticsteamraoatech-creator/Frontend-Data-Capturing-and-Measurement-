@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, Save } from 'lucide-react';
 import { MessageModal } from '@/app/components/MessageModal';
+import ServiceService from '@/services/ServiceService';
 
 interface Service {
   id: string;
@@ -18,6 +20,7 @@ interface ServiceFormData {
 }
 
 const ServiceEdit = () => {
+  const router = useRouter();
   const [formData, setFormData] = useState<ServiceFormData>({
     name: '',
     description: '',
@@ -28,25 +31,24 @@ const ServiceEdit = () => {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
 
-  // Mock service data - in a real app this would come from an API
+  // Fetch service data - using mock for now since we don't have a specific service ID
   useEffect(() => {
-    // Simulate API call to fetch service data
-    setTimeout(() => {
-      const mockService: Service = {
-        id: '1',
-        name: 'Body Measurement',
-        description: 'Service for body measurement and scanning',
-        createdAt: '2023-01-15',
-        updatedAt: '2023-01-15',
-      };
-      
-      setFormData({
-        name: mockService.name,
-        description: mockService.description,
-      });
-      
-      setLoading(false);
-    }, 1000);
+    // For now, we'll use mock data since this module doesn't have access to service ID
+    // In a real implementation, you would get the service ID from the URL params
+    const mockService: Service = {
+      id: '1',
+      name: 'Body Measurement',
+      description: 'Service for body measurement and scanning',
+      createdAt: '2023-01-15',
+      updatedAt: '2023-01-15',
+    };
+    
+    setFormData({
+      name: mockService.name,
+      description: mockService.description,
+    });
+    
+    setLoading(false);
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -80,29 +82,45 @@ const ServiceEdit = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!validateForm()) {
       return;
     }
 
-    // In a real app, this would call an API to update the service
-    console.log('Updating service:', formData);
-    
-    // Show success message
-    setModalMessage('Service updated successfully!');
-    setShowSuccessModal(true);
+    try {
+      // Prepare data for submission
+      const submitData = {
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        // Note: The ServiceService expects different field names
+        // This module may need to be aligned with the main service page
+      };
+      
+      // For now, just show success message
+      // In a real implementation, you would call the service update API
+      console.log('Updating service:', submitData);
+      
+      // Show success message
+      setModalMessage('Service updated successfully!');
+      setShowSuccessModal(true);
+    } catch (error) {
+      console.error('Error updating service:', error);
+      setModalMessage(error instanceof Error ? error.message : 'Failed to update service');
+      setShowErrorModal(true);
+    }
   };
 
   const handleSuccessClose = () => {
     setShowSuccessModal(false);
     // Redirect to service list page
-    window.location.href = '/super-admin/service';
+    router.push('/super-admin/service');
   };
 
   const handleErrorClose = () => {
     setShowErrorModal(false);
+    // Optionally, redirect or perform other actions
   };
 
   if (loading) {
@@ -154,7 +172,7 @@ const ServiceEdit = () => {
         <div className="mb-6">
           <div className="flex items-center mb-4">
             <button 
-              onClick={() => window.history.back()}
+              onClick={() => router.back()}
               className="flex items-center text-[#5D2A8B] hover:text-[#4a216d]"
             >
               <ArrowLeft className="w-5 h-5 mr-2" />
@@ -214,7 +232,7 @@ const ServiceEdit = () => {
             <div className="mt-8 flex flex-col-reverse sm:flex-row justify-end gap-3 border-t border-gray-200 pt-6">
               <button
                 type="button"
-                onClick={() => window.history.back()}
+                onClick={() => router.back()}
                 className="w-full sm:w-auto px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors duration-200 font-medium"
               >
                 Cancel

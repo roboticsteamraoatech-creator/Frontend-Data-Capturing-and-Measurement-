@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, Save, Package } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import { ArrowLeft, Save } from 'lucide-react';
 import ServiceService from '@/services/ServiceService';
 import { useAuthContext } from '@/AuthContext';
 
-const CreateServicePage = () => {
+const EditServicePage = () => {
   const router = useRouter();
+  const { id } = useParams();
   const { token } = useAuthContext();
   
   const [formData, setFormData] = useState({
@@ -18,9 +19,34 @@ const CreateServicePage = () => {
     yearlyPrice: '',
   });
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Fetch service data when component mounts
+  useEffect(() => {
+    const fetchService = async () => {
+      try {
+        const serviceService = new ServiceService(token);
+        const serviceData = await serviceService.getServiceById(id as string);
+        
+        setFormData({
+          serviceName: serviceData.serviceName,
+          description: serviceData.description || '',
+          monthlyPrice: serviceData.monthlyPrice.toString(),
+          quarterlyPrice: serviceData.quarterlyPrice.toString(),
+          yearlyPrice: serviceData.yearlyPrice.toString(),
+        });
+        setLoading(false);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load service');
+        console.error('Error loading service:', err);
+        setLoading(false);
+      }
+    };
+
+    fetchService();
+  }, [id]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -64,15 +90,15 @@ const CreateServicePage = () => {
         yearlyPrice: yearly,
       };
       
-      // Create service using ServiceService
+      // Update service using ServiceService
       const serviceService = new ServiceService(token);
-      await serviceService.createService(submitData);
+      await serviceService.updateService(id as string, submitData);
       
       // Show success message
-      setSuccessMessage('Service created successfully!');
+      setSuccessMessage('Service updated successfully!');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create service');
-      console.error('Error creating service:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update service');
+      console.error('Error updating service:', err);
     } finally {
       setLoading(false);
     }
@@ -107,6 +133,47 @@ const CreateServicePage = () => {
   const quarterlySavings = monthly > 0 ? (monthly * 3) - quarterly : 0;
   const yearlySavings = monthly > 0 ? (monthly * 12) - yearly : 0;
 
+  if (loading) {
+    return (
+      <div className="manrope ml-0 md:ml-[350px] pt-8 md:pt-8 p-4 md:p-8 min-h-screen bg-gray-50">
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap');
+          .manrope { font-family: 'Manrope', sans-serif; }
+        `}</style>
+        
+        <div className="max-w-4xl mx-auto">
+          <div className="mb-8">
+            <button
+              onClick={goBack}
+              className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
+            >
+              <ArrowLeft className="w-5 h-5 mr-2" />
+              Back to List
+            </button>
+            
+            <div>
+              <h1 className="text-2xl font-bold text-[#1A1A1A]">Edit Service</h1>
+              <p className="text-gray-600">Update service information and pricing</p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="animate-pulse">
+              <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
+              <div className="h-10 bg-gray-200 rounded w-1/2 mb-6"></div>
+              <div className="h-4 bg-gray-200 rounded w-full mb-4"></div>
+              <div className="h-4 bg-gray-200 rounded w-3/4 mb-6"></div>
+              <div className="h-10 bg-gray-200 rounded w-full mb-6"></div>
+              <div className="h-10 bg-gray-200 rounded w-full mb-6"></div>
+              <div className="h-10 bg-gray-200 rounded w-full mb-6"></div>
+              <div className="h-10 bg-gray-200 rounded w-32"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="manrope ml-0 md:ml-[350px] pt-8 md:pt-8 p-4 md:p-8 min-h-screen bg-gray-50">
       <style>{`
@@ -126,8 +193,8 @@ const CreateServicePage = () => {
           </button>
           
           <div>
-            <h1 className="text-2xl font-bold text-[#1A1A1A]">Create Service</h1>
-            <p className="text-gray-600">Add a new service with pricing options</p>
+            <h1 className="text-2xl font-bold text-[#1A1A1A]">Edit Service</h1>
+            <p className="text-gray-600">Update service information and pricing</p>
           </div>
         </div>
 
@@ -142,10 +209,9 @@ const CreateServicePage = () => {
 
             {/* Form Header */}
             <div className="mb-8 flex items-center">
-              
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Service Details</h2>
-                <p className="text-sm text-gray-600">Fill in the service information and pricing</p>
+                <p className="text-sm text-gray-600">Update the service information and pricing</p>
               </div>
             </div>
 
@@ -287,7 +353,8 @@ const CreateServicePage = () => {
               </div>
             </div>
 
-
+            {/* Pricing Summary */}
+            {/* Removed pricing summary section as per requirements */}
 
            
           </div>
@@ -308,7 +375,7 @@ const CreateServicePage = () => {
               disabled={loading}
             >
               <Save className="w-5 h-5 mr-2" />
-              {loading ? 'Creating...' : 'Create Service'}
+              {loading ? 'Saving...' : 'Update Service'}
             </button>
           </div>
         </form>
@@ -349,4 +416,4 @@ const CreateServicePage = () => {
   );
 };
 
-export default CreateServicePage;
+export default EditServicePage;
