@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, Save } from 'lucide-react';
 import { MessageModal } from '@/app/components/MessageModal';
+import ServiceService from '@/services/ServiceService';
 
 interface ServiceFormData {
   name: string;
@@ -10,6 +12,7 @@ interface ServiceFormData {
 }
 
 const ServiceCreate = () => {
+  const router = useRouter();
   const [formData, setFormData] = useState<ServiceFormData>({
     name: '',
     description: '',
@@ -50,25 +53,41 @@ const ServiceCreate = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!validateForm()) {
       return;
     }
 
-    // In a real app, this would call an API to create the service
-    console.log('Creating service:', formData);
-    
-    // Show success message
-    setModalMessage('Service created successfully!');
-    setShowSuccessModal(true);
+    try {
+      // Prepare data for submission
+      const submitData = {
+        serviceName: formData.name.trim(),
+        description: formData.description.trim(),
+        monthlyPrice: 0, // Default to 0, can be modified as needed
+        quarterlyPrice: 0,
+        yearlyPrice: 0,
+      };
+      
+      // Create service using ServiceService
+      const serviceService = new ServiceService();
+      await serviceService.createService(submitData);
+      
+      // Show success message
+      setModalMessage('Service created successfully!');
+      setShowSuccessModal(true);
+    } catch (error) {
+      console.error('Error creating service:', error);
+      setModalMessage(error instanceof Error ? error.message : 'Failed to create service');
+      setShowErrorModal(true);
+    }
   };
 
   const handleSuccessClose = () => {
     setShowSuccessModal(false);
     // Redirect to service list page
-    window.location.href = '/super-admin/service';
+    router.push('/super-admin/service');
   };
 
   const handleErrorClose = () => {
@@ -87,7 +106,7 @@ const ServiceCreate = () => {
         <div className="mb-6">
           <div className="flex items-center mb-4">
             <button 
-              onClick={() => window.history.back()}
+              onClick={() => router.back()}
               className="flex items-center text-[#5D2A8B] hover:text-[#4a216d]"
             >
               <ArrowLeft className="w-5 h-5 mr-2" />
@@ -147,7 +166,7 @@ const ServiceCreate = () => {
             <div className="mt-8 flex flex-col-reverse sm:flex-row justify-end gap-3 border-t border-gray-200 pt-6">
               <button
                 type="button"
-                onClick={() => window.history.back()}
+                onClick={() => router.back()}
                 className="w-full sm:w-auto px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors duration-200 font-medium"
               >
                 Cancel
