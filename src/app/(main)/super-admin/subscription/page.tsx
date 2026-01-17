@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Plus, Eye, Edit, Trash2, MoreVertical, Filter } from 'lucide-react';
+import { Search, Plus, Eye, Edit, Trash2, MoreVertical, Filter, X } from 'lucide-react';
 import SubscriptionService, { SubscriptionPackage } from "@/services/subscriptionService";
 
 const SubscriptionPage = () => {
@@ -17,6 +17,11 @@ const SubscriptionPage = () => {
   const [deleteMessage, setDeleteMessage] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [showFeaturesModal, setShowFeaturesModal] = useState(false);
+  const [currentFeatures, setCurrentFeatures] = useState<string[]>([]);
+  const [currentPackageTitle, setCurrentPackageTitle] = useState('');
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [currentNote, setCurrentNote] = useState('');
 
   const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
@@ -214,19 +219,56 @@ const SubscriptionPage = () => {
   const activeSubscriptions = subscriptions.filter(s => s.status === 'active').length;
   const inactiveSubscriptions = subscriptions.filter(s => s.status === 'inactive').length;
   const totalFeatures = subscriptions.reduce((acc, sub) => acc + (sub.features?.length || 0), 0);
+  const totalServiceCost = subscriptions.reduce((acc, sub) => acc + (sub.totalServiceCost || 0), 0);
+  const totalDiscountAmount = subscriptions.reduce((acc, sub) => acc + (sub.discountAmount || 0), 0);
+  const avgDiscountPercentage = subscriptions.length > 0 
+    ? (subscriptions.reduce((acc, sub) => acc + (sub.discountPercentage || 0), 0) / (subscriptions.filter(sub => sub.discountPercentage !== undefined).length || 1)).toFixed(2)
+    : '0.00';
+  const totalFinalPrice = subscriptions.reduce((acc, sub) => acc + (sub.finalPriceAfterDiscount || 0), 0);
 
   if (loading) {
     return (
-      <div className="manrope ml-0 md:ml-[350px] pt-8 md:pt-8 p-4 md:p-8 min-h-screen bg-gray-50">
+      <div className="ml-0 md:ml-[350px] pt-8 md:pt-8 p-4 md:p-8 min-h-screen bg-gray-50">
         <style jsx>{`
           @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap');
-          .manrope { font-family: 'Manrope', sans-serif; }
+          body, .manrope-text { 
+            font-family: 'Manrope', sans-serif; 
+            font-weight: 400; 
+            font-size: 14px; 
+            line-height: 100%; 
+            letter-spacing: 0%; 
+            color: #1A1A1A; 
+          }
         `}</style>
         
         <div className="max-w-7xl mx-auto">
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-[#1A1A1A]">Subscription Package Management</h1>
             <p className="text-gray-600">Manage subscription packages</p>
+          </div>
+          
+          {/* Stats Summary */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+              <p className="text-sm text-gray-600 manrope-text">Active</p>
+              <p className="text-2xl font-bold text-green-600 manrope-text">{activeSubscriptions}</p>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+              <p className="text-sm text-gray-600 manrope-text">Inactive</p>
+              <p className="text-2xl font-bold text-red-600 manrope-text">{inactiveSubscriptions}</p>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+              <p className="text-sm text-gray-600 manrope-text">Total Features</p>
+              <p className="text-2xl font-bold text-blue-600 manrope-text">{totalFeatures}</p>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+              <p className="text-sm text-gray-600 manrope-text">Total Service Cost</p>
+              <p className="text-2xl font-bold text-purple-600 manrope-text">{formatCurrency(totalServiceCost)}</p>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+              <p className="text-sm text-gray-600 manrope-text">Avg Discount %</p>
+              <p className="text-2xl font-bold text-yellow-600 manrope-text">{avgDiscountPercentage}%</p>
+            </div>
           </div>
           
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -237,6 +279,18 @@ const SubscriptionPage = () => {
                 <div key={item} className="flex items-center justify-between py-4 border-b border-gray-100">
                   <div className="h-4 bg-gray-200 rounded w-1/4"></div>
                   <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/6"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/6"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/6"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/6"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/6"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/6"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/6"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/6"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/6"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/6"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/6"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/6"></div>
                   <div className="h-4 bg-gray-200 rounded w-1/6"></div>
                   <div className="h-8 bg-gray-200 rounded w-20"></div>
                 </div>
@@ -249,18 +303,25 @@ const SubscriptionPage = () => {
   }
 
   return (
-    <div className="manrope ml-0 md:ml-[350px] pt-8 md:pt-8 p-4 md:p-8 min-h-screen bg-gray-50">
+    <div className="ml-0 md:ml-[350px] pt-8 md:pt-8 p-4 md:p-8 min-h-screen bg-gray-50">
       <style jsx>{`
         @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap');
-        .manrope { font-family: 'Manrope', sans-serif; }
+        body, .manrope-text { 
+          font-family: 'Manrope', sans-serif; 
+          font-weight: 400; 
+          font-size: 14px; 
+          line-height: 100%; 
+          letter-spacing: 0%; 
+          color: #1A1A1A; 
+        }
       `}</style>
 
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl mx-auto manrope-text">
         {/* Page Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-[#1A1A1A]">Subscription Package Management</h1>
-            <p className="text-gray-600">Manage subscription packages</p>
+            <h1 className="text-2xl font-bold text-[#1A1A1A] manrope-text">Subscription Package Management</h1>
+            <p className="text-gray-600 manrope-text">Manage subscription packages</p>
           </div>
                 
           {/* Add Package Button */}
@@ -300,11 +361,11 @@ const SubscriptionPage = () => {
           
           {/* Search results info */}
           <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-200">
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-gray-500 manrope-text">
               Showing {filteredSubscriptions.length} of {subscriptions.length} packages
               {searchTerm && (
-                <span className="ml-2">
-                  for "<span className="font-medium">{searchTerm}</span>"
+                <span className="ml-2 manrope-text">
+                  for "<span className="font-medium manrope-text">{searchTerm}</span>"
                 </span>
               )}
             </div>
@@ -327,13 +388,21 @@ const SubscriptionPage = () => {
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50">
-                  <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Title</th>
-                  <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Description</th>
-                  <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Features</th>
-                  <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Price</th>
-                  <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                  <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Created Date</th>
-                  <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                  <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider manrope-text">Title</th>
+                  <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider manrope-text">Description</th>
+                  <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider manrope-text">Services</th>
+                  <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider manrope-text">Features</th>
+                  <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider manrope-text">Total Service Cost</th>
+                  <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider manrope-text">Final Price After Discount</th>
+                  <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider manrope-text">Discount Amount</th>
+                  <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider manrope-text">Discount %</th>
+                  <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider manrope-text">Promo Code</th>
+                  <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider manrope-text">Promo Start Date</th>
+                  <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider manrope-text">Promo End Date</th>
+                  <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider manrope-text">Note</th>
+                  <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider manrope-text">Status</th>
+                  <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider manrope-text">Created Date</th>
+                  <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider manrope-text">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -343,30 +412,87 @@ const SubscriptionPage = () => {
                     return (
                       <tr key={subscriptionId} className="border-t border-gray-100 hover:bg-gray-50 group">
                         <td className="py-4 px-4">
-                          <div className="font-medium text-gray-900">{subscription.title}</div>
+                          <div className="font-medium text-gray-900 manrope-text">{subscription.title}</div>
                         </td>
                         <td className="py-4 px-4">
-                          <div className="text-gray-600 max-w-xs truncate" title={subscription.description}>
+                          <div className="text-gray-600 max-w-xs truncate manrope-text" title={subscription.description}>
                             {subscription.description}
                           </div>
                         </td>
                         <td className="py-4 px-4">
-                          <div className="text-gray-700 max-w-xs truncate" title={subscription.features?.join(', ')}>
-                            {subscription.features?.slice(0, 2).join(', ')}
-                            {subscription.features && subscription.features.length > 2 && (
-                              <span className="text-gray-500 ml-1">+{subscription.features.length - 2} more</span>
+                          <div className="space-y-1 manrope-text">
+                            {subscription.services && Array.isArray(subscription.services) && subscription.services.map((service, idx) => (
+                              <div key={idx} className="text-xs bg-gray-100 px-2 py-1 rounded manrope-text">
+                                {typeof service === 'string' ? service : service.serviceName || service.serviceId}
+                              </div>
+                            ))}
+                            {(subscription.services === undefined || subscription.services.length === 0) && (
+                              <div className="text-xs text-gray-500 manrope-text">-</div>
                             )}
                           </div>
                         </td>
                         <td className="py-4 px-4">
-                          <div className="text-gray-700 font-medium">
-                            {formatCurrency(subscription.price)}
+                          <button 
+                            onClick={() => {
+                              setCurrentFeatures(subscription.features || []);
+                              setCurrentPackageTitle(subscription.title);
+                              setShowFeaturesModal(true);
+                            }}
+                            className="text-[#5D2A8B] hover:text-[#4a216d] hover:underline text-sm manrope-text"
+                          >
+                            View Features ({subscription.features?.length || 0})
+                          </button>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="text-gray-700 font-medium manrope-text">
+                            {subscription.totalServiceCost !== undefined ? formatCurrency(subscription.totalServiceCost) : 'N/A'}
                           </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="text-green-600 font-medium manrope-text">
+                            {subscription.finalPriceAfterDiscount !== undefined ? formatCurrency(subscription.finalPriceAfterDiscount) : 'N/A'}
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="text-red-600 font-medium manrope-text">
+                            {subscription.discountAmount !== undefined ? formatCurrency(subscription.discountAmount) : 'N/A'}
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="text-gray-700 font-medium manrope-text">
+                            {subscription.discountPercentage !== undefined ? `${subscription.discountPercentage}%` : 'N/A'}
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="text-gray-700 font-medium manrope-text">
+                            {subscription.promoCode || 'N/A'}
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="text-gray-700 font-medium manrope-text">
+                            {subscription.promoStartDate ? formatDate(new Date(subscription.promoStartDate).toISOString()) : 'N/A'}
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="text-gray-700 font-medium manrope-text">
+                            {subscription.promoEndDate ? formatDate(new Date(subscription.promoEndDate).toISOString()) : 'N/A'}
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <button 
+                            onClick={() => {
+                              setCurrentNote(subscription.note || '');
+                              setShowNoteModal(true);
+                            }}
+                            className="text-[#5D2A8B] hover:text-[#4a216d] hover:underline text-sm manrope-text"
+                          >
+                            {subscription.note ? 'View Note' : 'N/A'}
+                          </button>
                         </td>
                         <td className="py-4 px-4">
                           {getStatusBadge(subscription)}
                         </td>
-                        <td className="py-4 px-4 text-gray-600">
+                        <td className="py-4 px-4 text-gray-600 manrope-text">
                           {formatDate(subscription.createdAt)}
                         </td>
                         <td className="py-4 px-4">
@@ -417,7 +543,7 @@ const SubscriptionPage = () => {
                   })
                 ) : (
                   <tr>
-                    <td colSpan={7} className="py-12 px-4 text-center text-gray-500">
+                    <td colSpan={15} className="py-12 px-4 text-center text-gray-500">
                       {searchTerm || statusFilter !== 'all' ? (
                         <div className="flex flex-col items-center">
                           <Search className="w-16 h-16 text-gray-300 mb-4" />
@@ -457,6 +583,98 @@ const SubscriptionPage = () => {
           </div>
         </div>
       </div>
+      
+      {/* Features Modal */}
+      {showFeaturesModal && (
+        <div 
+          className="fixed inset-0 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowFeaturesModal(false)}
+        >
+          <div 
+            className="bg-white rounded-xl shadow-lg max-w-md w-full mx-4 border border-gray-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-gray-900 manrope-text">Features for {currentPackageTitle}</h3>
+                <button
+                  onClick={() => setShowFeaturesModal(false)}
+                  className="text-gray-400 hover:text-gray-600 manrope-text"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {currentFeatures.length > 0 ? (
+                  currentFeatures.map((feature, index) => (
+                    <div 
+                      key={index}
+                      className="flex items-start p-3 bg-gray-50 rounded-lg border border-gray-200"
+                    >
+                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#5D2A8B] flex items-center justify-center mt-0.5">
+                        <span className="text-white text-xs font-bold manrope-text">{index + 1}</span>
+                      </div>
+                      <div className="ml-3 text-gray-700 manrope-text">{feature}</div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-gray-500 manrope-text">
+                    <p className="manrope-text">No features available</p>
+                  </div>
+                )}
+              </div>
+              
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => setShowFeaturesModal(false)}
+                  className="px-4 py-2 bg-[#5D2A8B] text-white rounded-lg hover:bg-[#4a216d] transition-colors manrope-text"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Note Modal */}
+      {showNoteModal && (
+        <div 
+          className="fixed inset-0 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowNoteModal(false)}
+        >
+          <div 
+            className="bg-white rounded-xl shadow-lg max-w-md w-full mx-4 border border-gray-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-gray-900 manrope-text">Note</h3>
+                <button
+                  onClick={() => setShowNoteModal(false)}
+                  className="text-gray-400 hover:text-gray-600 manrope-text"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              
+              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <p className="text-gray-700 whitespace-pre-wrap manrope-text">{currentNote}</p>
+              </div>
+              
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => setShowNoteModal(false)}
+                  className="px-4 py-2 bg-[#5D2A8B] text-white rounded-lg hover:bg-[#4a216d] transition-colors manrope-text"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Delete Confirmation Modal - No Background */}
       {showDeleteModal && subscriptionToDelete && (

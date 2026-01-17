@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import ServiceService from '@/services/ServiceService';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Save, Tag, DollarSign, FileText, Plus, X, Calendar, Percent, Gift, ShoppingBag, Building, Users } from 'lucide-react';
 import SubscriptionService, { CreateSubscriptionPackageData } from '@/services/subscriptionService';
@@ -8,10 +9,17 @@ import SubscriptionService, { CreateSubscriptionPackageData } from '@/services/s
 const CreateSubscriptionPage = () => {
   const router = useRouter();
   
+  interface ServiceOption {
+    id: string;
+    name: string;
+    monthlyPrice: number;
+    quarterlyPrice: number;
+    yearlyPrice: number;
+  }
+  
   interface ExtendedSubscriptionData {
     title: string;
     description: string;
-    price: number;
     features: string[];
     note?: string;
     featuresInput: string;
@@ -32,12 +40,15 @@ const CreateSubscriptionPage = () => {
       industries: string[];
       categories: string[];
     };
+    calculatedPrice: number; // Auto-calculated based on selected services
   }
+  
+  const [availableServices, setAvailableServices] = useState<ServiceOption[]>([]);
+  const [loadingServices, setLoadingServices] = useState<boolean>(true);
 
   const [formData, setFormData] = useState<ExtendedSubscriptionData>({
     title: '',
     description: '',
-    price: 0,
     features: [],
     note: '',
     featuresInput: '',
@@ -50,9 +61,64 @@ const CreateSubscriptionPage = () => {
       individual: false,
       industries: [],
       categories: []
-    }
+    },
+    calculatedPrice: 0
   });
-
+    
+  // Load available services
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        setLoadingServices(true);
+        const serviceService = new ServiceService();
+        const services = await serviceService.getAllServices();
+          
+        // Map services to the format expected by the form
+        const serviceOptions: ServiceOption[] = services.map(service => ({
+          id: service.id,
+          name: service.serviceName,
+          monthlyPrice: service.monthlyPrice,
+          quarterlyPrice: service.quarterlyPrice,
+          yearlyPrice: service.yearlyPrice,
+        }));
+          
+        setAvailableServices(serviceOptions);
+      } catch (error) {
+        console.error('Error fetching services:', error);
+        // Set some default services in case of error
+        setAvailableServices([
+          { id: '65a1b2c3d4e5f6g7h8i9j0k1', name: 'Body Measurement', monthlyPrice: 5000, quarterlyPrice: 13500, yearlyPrice: 48000 },
+          { id: '65a1b2c3d4e5f6g7h8i9j0k2', name: 'Customer Service', monthlyPrice: 3000, quarterlyPrice: 8100, yearlyPrice: 28800 },
+          { id: '65a1b2c3d4e5f6g7h8i9j0k3', name: 'Premium Support', monthlyPrice: 8000, quarterlyPrice: 21600, yearlyPrice: 76800 },
+          { id: '65a1b2c3d4e5f6g7h8i9j0k4', name: 'Analytics Dashboard', monthlyPrice: 10000, quarterlyPrice: 27000, yearlyPrice: 96000 },
+        ]);
+      } finally {
+        setLoadingServices(false);
+      }
+    };
+      
+    fetchServices();
+  }, []);
+    
+  // Calculate the total price based on selected services and discount
+  useEffect(() => {
+    const totalPrice = formData.services.reduce((sum, service) => {
+      if (service.selectedCycle === 'monthly') return sum + service.monthlyPrice;
+      if (service.selectedCycle === 'quarterly') return sum + service.quarterlyPrice;
+      return sum + service.yearlyPrice;
+    }, 0);
+      
+    const discountAmount = formData.discountPercentage 
+      ? (totalPrice * formData.discountPercentage) / 100 
+      : 0;
+    const finalPrice = totalPrice - discountAmount;
+      
+    setFormData(prev => ({
+      ...prev,
+      calculatedPrice: finalPrice
+    }));
+  }, [formData.services, formData.discountPercentage]);
+    
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -65,11 +131,7 @@ const CreateSubscriptionPage = () => {
     return null;
   };
 
-  const validatePrice = (price: number): string | null => {
-    if (price <= 0) return 'Price must be a positive number';
-    if (price > 1000000) return 'Price is too high';
-    return null;
-  };
+
 
   const validateDescription = (description: string): string | null => {
     if (!description.trim()) return 'Description is required';
@@ -106,9 +168,7 @@ const CreateSubscriptionPage = () => {
   };
 
   const validateApplyTo = (applyTo: { individual: boolean; industries: string[]; categories: string[] }): string | null => {
-    if (!applyTo.individual && applyTo.industries.length === 0 && applyTo.categories.length === 0) {
-      return 'Please select at least one option for who this subscription applies to';
-    }
+    // ApplyTo is not required, so always return null
     return null;
   };
 
@@ -120,9 +180,6 @@ const CreateSubscriptionPage = () => {
     
     const descriptionError = validateDescription(formData.description);
     if (descriptionError) errors.description = descriptionError;
-    
-    const priceError = validatePrice(formData.price);
-    if (priceError) errors.price = priceError;
     
     const featuresError = validateFeatures(formData.features);
     if (featuresError) errors.features = featuresError;
@@ -137,8 +194,9 @@ const CreateSubscriptionPage = () => {
     const promoDatesError = validatePromoDates(formData.promoStartDate, formData.promoEndDate);
     if (promoDatesError) errors.promoDates = promoDatesError;
     
-    const applyToError = validateApplyTo(formData.applyTo);
-    if (applyToError) errors.applyTo = applyToError;
+    // ApplyTo is not required, so no validation needed
+    // const applyToError = validateApplyTo(formData.applyTo);
+    // if (applyToError) errors.applyTo = applyToError;
     
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
@@ -193,19 +251,10 @@ const CreateSubscriptionPage = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     
-    if (name === 'price') {
-      // Ensure price is always a number
-      const numValue = value === '' ? 0 : parseFloat(value);
-      setFormData(prev => ({
-        ...prev,
-        [name]: isNaN(numValue) ? 0 : numValue
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }));
-    }
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
     
     // Clear error when user starts typing
     if (fieldErrors[name]) {
@@ -229,17 +278,36 @@ const CreateSubscriptionPage = () => {
       setLoading(true);
       setError(null);
       
+      // Calculate total price based on selected services
+      const totalPrice = formData.services.reduce((sum, service) => {
+        if (service.selectedCycle === 'monthly') return sum + service.monthlyPrice;
+        if (service.selectedCycle === 'quarterly') return sum + service.quarterlyPrice;
+        return sum + service.yearlyPrice;
+      }, 0);
+      
+      // Apply discount if applicable
+      const discountAmount = formData.discountPercentage 
+        ? (totalPrice * formData.discountPercentage) / 100 
+        : 0;
+      const finalPrice = totalPrice - discountAmount;
+      
       // Prepare data for API submission - only include fields expected by the API
       const formattedData: CreateSubscriptionPackageData = {
         title: formData.title,
         description: formData.description,
-        price: parseFloat(formData.price.toFixed(2)),
-        features: formData.features,
-        note: formData.note,
-        // Map our enhanced fields to API-compatible fields if needed
-        services: formData.services.map(s => `${s.name}`).join(', '), // Convert services array to string
+        services: formData.services.map(service => ({
+          serviceId: service.id,
+          duration: service.selectedCycle
+        })),
+        promoCode: formData.promoCode,
+        discountPercentage: formData.discountPercentage,
         promoStartDate: formData.promoStartDate,
         promoEndDate: formData.promoEndDate,
+        features: formData.features,
+        note: formData.note,
+        // Don't include applyTo in the payload as it's not required
+        // applyTo: formData.applyTo,
+        price: finalPrice, // Final calculated price after discount
       };
       
       // Create package using service
@@ -359,167 +427,9 @@ const CreateSubscriptionPage = () => {
 
             {/* Divider */}
             <div className="border-t border-gray-200 my-8"></div>
-
-            {/* Pricing Section */}
-            <div className="mb-8">
-              <div className="flex items-center mb-6">
-                <div className="p-2 bg-green-100 rounded-lg mr-3">
-                  <DollarSign className="w-6 h-6 text-green-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Pricing</h3>
-                  <p className="text-sm text-gray-600">Set the subscription price</p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Subscription Price (₦) *
-                </label>
-                <div className="flex items-center">
-                  <div className="flex-1">
-                    <input
-                      type="number"
-                      name="price"
-                      value={formData.price || ''}
-                      onChange={handleChange}
-                      min="0"
-                      step="1"
-                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent transition-colors ${
-                        fieldErrors.price ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="ml-4 text-lg font-semibold text-green-600">
-                    {formData.price > 0 ? formatCurrency(formData.price) : 'Enter price'}
-                  </div>
-                </div>
-                {fieldErrors.price && (
-                  <p className="mt-2 text-sm text-red-600">{fieldErrors.price}</p>
-                )}
-                <p className="mt-1 text-xs text-gray-500">
-                  Price will be charged on a recurring basis as per the subscription period
-                </p>
-              </div>
-            </div>
-
-            {/* Divider */}
-            <div className="border-t border-gray-200 my-8"></div>
-
-            {/* Features Section */}
-            <div className="mb-8">
+           <div className="mt-8 bg-gray-50 rounded-xl p-6 border border-gray-200">
               <div className="flex items-center mb-6">
                 
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Features *</h3>
-                  <p className="text-sm text-gray-600">Add features included in this package</p>
-                </div>
-              </div>
-
-              {/* Feature Input */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Add Feature
-                </label>
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <input
-                      type="text"
-                      value={formData.featuresInput}
-                      onChange={(e) => setFormData(prev => ({ ...prev, featuresInput: e.target.value }))}
-                      onKeyDown={handleKeyDown}
-                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent transition-colors ${
-                        fieldErrors.features ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      placeholder="Enter a feature and press Enter or click Add"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={addFeature}
-                    className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center transition-colors"
-                  >
-                    <Plus className="w-5 h-5 mr-2" />
-                    Add
-                  </button>
-                </div>
-                {fieldErrors.features && (
-                  <p className="mt-2 text-sm text-red-600">{fieldErrors.features}</p>
-                )}
-                <p className="mt-2 text-xs text-gray-500">
-                  Press Enter or click Add to add the feature
-                </p>
-              </div>
-
-              {/* Features List */}
-              {formData.features.length > 0 ? (
-                <div className="mt-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-sm font-medium text-gray-700">
-                      Added Features ({formData.features.length})
-                    </h4>
-                    <span className="text-xs text-gray-500">Click × to remove</span>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {formData.features.map((feature, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
-                      >
-                        <div className="flex items-center">
-                          <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                            <FileText className="w-4 h-4 text-blue-600" />
-                          </div>
-                          <span className="text-gray-800">{feature}</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removeFeature(index)}
-                          className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
-                          title="Remove feature"
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-6 p-8 border-2 border-dashed border-gray-300 rounded-lg text-center">
-                  <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-600 mb-2">No features added yet</p>
-                  <p className="text-sm text-gray-500">
-                    Add features that users will get with this subscription
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Note Section */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Additional Notes (Optional)
-              </label>
-              <textarea
-                name="note"
-                value={formData.note}
-                onChange={handleChange}
-                rows={3}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent transition-colors"
-                placeholder="Any additional information, terms, or conditions..."
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                This will be displayed to users before they subscribe
-              </p>
-            </div>
-
-            {/* Services Section */}
-            <div className="mt-8 bg-gray-50 rounded-xl p-6 border border-gray-200">
-              <div className="flex items-center mb-6">
-                <div className="p-2 bg-purple-100 rounded-lg mr-3">
-                  <ShoppingBag className="w-6 h-6 text-purple-600" />
-                </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">Services</h3>
                   <p className="text-sm text-gray-600">Add services included in this subscription package</p>
@@ -535,40 +445,9 @@ const CreateSubscriptionPage = () => {
                   <select 
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
                     onChange={(e) => {
-                      const selectedServiceName = e.target.value;
-                      if (selectedServiceName && !formData.services.some(s => s.name === selectedServiceName)) {
-                        const mockServices = [
-                          {
-                            id: '1',
-                            name: 'Body Measurement',
-                            monthlyPrice: 5000,
-                            quarterlyPrice: 13500,
-                            yearlyPrice: 48000
-                          },
-                          {
-                            id: '2',
-                            name: 'Customer Service',
-                            monthlyPrice: 3000,
-                            quarterlyPrice: 8100,
-                            yearlyPrice: 28800
-                          },
-                          {
-                            id: '3',
-                            name: 'Premium Support',
-                            monthlyPrice: 8000,
-                            quarterlyPrice: 21600,
-                            yearlyPrice: 76800
-                          },
-                          {
-                            id: '4',
-                            name: 'Analytics Dashboard',
-                            monthlyPrice: 10000,
-                            quarterlyPrice: 27000,
-                            yearlyPrice: 96000
-                          }
-                        ];
-                        
-                        const selectedService = mockServices.find(service => service.name === selectedServiceName);
+                      const selectedServiceId = e.target.value;
+                      if (selectedServiceId && !formData.services.some(s => s.id === selectedServiceId)) {
+                        const selectedService = availableServices.find(service => service.id === selectedServiceId);
                         if (selectedService) {
                           setFormData(prev => ({
                             ...prev,
@@ -581,12 +460,18 @@ const CreateSubscriptionPage = () => {
                       }
                     }}
                     value=""
+                    disabled={loadingServices}
                   >
                     <option value="">Select a service to add...</option>
-                    <option value="Body Measurement">Body Measurement</option>
-                    <option value="Customer Service">Customer Service</option>
-                    <option value="Premium Support">Premium Support</option>
-                    <option value="Analytics Dashboard">Analytics Dashboard</option>
+                    {loadingServices ? (
+                      <option>Loading services...</option>
+                    ) : (
+                      availableServices.map(service => (
+                        <option key={service.id} value={service.id}>
+                          {service.name}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
 
@@ -666,13 +551,153 @@ const CreateSubscriptionPage = () => {
                 )}
               </div>
             </div>
+            {/* Pricing Section */}
+            <div className="mb-8">
+              <div className="flex items-center mb-6">
+               
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Pricing</h3>
+                  <p className="text-sm text-gray-600">Set the subscription price</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Calculated Subscription Price (₦)
+                </label>
+                <div className="flex items-center">
+                  <div className="flex-1">
+                    <input
+                      type="number"
+                      name="calculatedPrice"
+                      value={formData.calculatedPrice || ''}
+                      onChange={handleChange}
+                      min="0"
+                      step="1"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent transition-colors"
+                      placeholder="Calculated automatically"
+                      readOnly
+                    />
+                  </div>
+                  <div className="ml-4 text-lg font-semibold text-green-600">
+                    {formData.calculatedPrice > 0 ? formatCurrency(formData.calculatedPrice) : 'Calculated automatically'}
+                  </div>
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Price is calculated based on selected services and applied discounts
+                </p>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-gray-200 my-8"></div>
+
+            {/* Features Section */}
+            <div className="mb-8">
+              <div className="flex items-center mb-6">
+                
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Features *</h3>
+                  <p className="text-sm text-gray-600">Add features included in this subscription package</p>
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Add Feature
+                </label>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={formData.featuresInput}
+                      onChange={(e) => setFormData(prev => ({ ...prev, featuresInput: e.target.value }))}
+                      onKeyDown={handleKeyDown}
+                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent transition-colors ${
+                        fieldErrors.features ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="Enter a feature and press Enter or click Add"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addFeature}
+                    className="px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                  >
+                    <Plus className="w-5 h-5" />
+                  </button>
+                </div>
+                {fieldErrors.features && (
+                  <p className="mt-2 text-sm text-red-600">{fieldErrors.features}</p>
+                )}
+                <p className="mt-2 text-xs text-gray-500">
+                  Press Enter or click Add to add the feature
+                </p>
+              </div>
+              
+              {/* Features List */}
+              {formData.features.length > 0 ? (
+                <div className="mt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-sm font-medium text-gray-700">
+                      Added Features ({formData.features.length})
+                    </h4>
+                    <span className="text-xs text-gray-500">Click × to remove</span>
+                  </div>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {formData.features.map((feature, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg"
+                      >
+                        <span className="text-gray-800">{feature}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeFeature(index)}
+                          className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                          title="Remove feature"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-6 p-4 border-2 border-dashed border-gray-300 rounded-lg text-center">
+                  <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-600 mb-2">No features added yet</p>
+                  <p className="text-sm text-gray-500">
+                    Add features that users will get with this subscription
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Note Section */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Additional Notes (Optional)
+              </label>
+              <textarea
+                name="note"
+                value={formData.note}
+                onChange={handleChange}
+                rows={3}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent transition-colors"
+                placeholder="Any additional information, terms, or conditions..."
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                This will be displayed to users before they subscribe
+              </p>
+            </div>
+
+            
 
             {/* Promo Code & Discount Section */}
             <div className="mt-8 bg-gray-50 rounded-xl p-6 border border-gray-200">
               <div className="flex items-center mb-6">
-                <div className="p-2 bg-green-100 rounded-lg mr-3">
-                  <Gift className="w-6 h-6 text-green-600" />
-                </div>
+                
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">Promo Code & Discount</h3>
                   <p className="text-sm text-gray-600">Apply promotional codes and discounts to this subscription</p>
@@ -772,30 +797,30 @@ const CreateSubscriptionPage = () => {
                 <h4 className="text-md font-medium text-gray-900 mb-3">Price Calculation</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="p-3 bg-white border border-gray-200 rounded-lg">
-                    <p className="text-sm text-gray-600">Original Price</p>
-                    <p className="text-lg font-semibold text-gray-900">₦{(formData.price + formData.services.reduce((sum, service) => {
+                    <p className="text-sm text-[#1A1A1A]">Original Price</p>
+                    <p className="text-lg font-semibold text-gray-900">₦{formData.services.reduce((sum, service) => {
                       if (service.selectedCycle === 'monthly') return sum + service.monthlyPrice;
                       if (service.selectedCycle === 'quarterly') return sum + service.quarterlyPrice;
                       return sum + service.yearlyPrice;
-                    }, 0)).toLocaleString()}</p>
+                    }, 0).toLocaleString()}</p>
                   </div>
                   
                   <div className="p-3 bg-white border border-gray-200 rounded-lg">
-                    <p className="text-sm text-gray-600">Discount Amount</p>
-                    <p className="text-lg font-semibold text-red-600">-₦{Math.round(((formData.price + formData.services.reduce((sum, service) => {
+                    <p className="text-sm text-[#1A1A1A]">Discount Amount</p>
+                    <p className="text-lg font-semibold text-[#1A1A1A]">-₦{Math.round((formData.services.reduce((sum, service) => {
                       if (service.selectedCycle === 'monthly') return sum + service.monthlyPrice;
                       if (service.selectedCycle === 'quarterly') return sum + service.quarterlyPrice;
                       return sum + service.yearlyPrice;
-                    }, 0)) * formData.discountPercentage) / 100).toLocaleString()}</p>
+                    }, 0) * formData.discountPercentage) / 100).toLocaleString()}</p>
                   </div>
                   
-                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <p className="text-sm text-green-700">Final Price After Discount</p>
-                    <p className="text-lg font-semibold text-green-700">₦{Math.max(0, Math.round((formData.price + formData.services.reduce((sum, service) => {
+                  <div className="p-3 bg-white border border-gray-200 rounded-lg">
+                    <p className="text-sm text-[#1A1A1A]">Final Price After Discount</p>
+                    <p className="text-lg font-semibold text-green-700">₦{Math.max(0, Math.round(formData.services.reduce((sum, service) => {
                       if (service.selectedCycle === 'monthly') return sum + service.monthlyPrice;
                       if (service.selectedCycle === 'quarterly') return sum + service.quarterlyPrice;
                       return sum + service.yearlyPrice;
-                    }, 0)) * (1 - formData.discountPercentage / 100))).toLocaleString()}</p>
+                    }, 0) * (1 - formData.discountPercentage / 100))).toLocaleString()}</p>
                   </div>
                 </div>
               </div>
@@ -804,9 +829,7 @@ const CreateSubscriptionPage = () => {
             {/* Apply To Options Section */}
             <div className="mt-8 bg-gray-50 rounded-xl p-6 border border-gray-200">
               <div className="flex items-center mb-6">
-                <div className="p-2 bg-blue-100 rounded-lg mr-3">
-                  <Users className="w-6 h-6 text-blue-600" />
-                </div>
+                
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">Apply To</h3>
                   <p className="text-sm text-gray-600">Specify who this subscription is available to</p>
@@ -937,165 +960,7 @@ const CreateSubscriptionPage = () => {
               </div>
             </div>
 
-            {/* Enhanced Preview Section */}
-            {(formData.title || formData.description || formData.price > 0 || formData.features.length > 0 || formData.services.length > 0 || formData.promoCode || formData.discountPercentage > 0 || formData.applyTo.individual || formData.applyTo.industries.length > 0 || formData.applyTo.categories.length > 0) && (
-              <div className="mt-8 p-6 bg-gray-50 rounded-lg border border-gray-200">
-                <h4 className="text-lg font-semibold text-gray-900 mb-4">Package Preview</h4>
-                <div className="space-y-4">
-                  {formData.title && (
-                    <div>
-                      <p className="text-sm text-gray-600">Title</p>
-                      <p className="font-medium text-gray-900">{formData.title}</p>
-                    </div>
-                  )}
-                  {formData.description && (
-                    <div>
-                      <p className="text-sm text-gray-600">Description</p>
-                      <p className="text-gray-700">{formData.description}</p>
-                    </div>
-                  )}
-                  {formData.price > 0 && (
-                    <div>
-                      <p className="text-sm text-gray-600">Base Price</p>
-                      <p className="text-2xl font-bold text-green-600">{formatCurrency(formData.price)}</p>
-                    </div>
-                  )}
-                  {formData.features.length > 0 && (
-                    <div>
-                      <p className="text-sm text-gray-600 mb-2">Features</p>
-                      <ul className="space-y-2">
-                        {formData.features.map((feature, index) => (
-                          <li key={index} className="flex items-start">
-                            <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3"></div>
-                            <span className="text-gray-700">{feature}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  
-                  {/* Services Preview */}
-                  {formData.services.length > 0 && (
-                    <div>
-                      <p className="text-sm text-gray-600 mb-2">Included Services</p>
-                      <ul className="space-y-2">
-                        {formData.services.map((service, index) => (
-                          <li key={index} className="flex items-center justify-between p-2 bg-white rounded border">
-                            <span className="text-gray-700">{service.name}</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
-                                {service.selectedCycle.charAt(0).toUpperCase() + service.selectedCycle.slice(1)}
-                              </span>
-                              <span className="text-gray-900 font-medium">
-                                {service.selectedCycle === 'monthly' && formatCurrency(service.monthlyPrice)}
-                                {service.selectedCycle === 'quarterly' && formatCurrency(service.quarterlyPrice)}
-                                {service.selectedCycle === 'yearly' && formatCurrency(service.yearlyPrice)}
-                              </span>
-                            </div>
-                          </li>
-                        ))}
-                        <li className="flex items-center justify-between pt-2 border-t border-gray-200 font-semibold">
-                          <span>Total Services Cost</span>
-                          <span>₦{formData.services.reduce((sum, service) => {
-                            if (service.selectedCycle === 'monthly') return sum + service.monthlyPrice;
-                            if (service.selectedCycle === 'quarterly') return sum + service.quarterlyPrice;
-                            return sum + service.yearlyPrice;
-                          }, 0).toLocaleString()}</span>
-                        </li>
-                      </ul>
-                    </div>
-                  )}
-                  
-                  {/* Promo Code & Discount Preview */}
-                  {(formData.promoCode || formData.discountPercentage > 0 || formData.promoStartDate || formData.promoEndDate) && (
-                    <div className="pt-2 border-t border-gray-200">
-                      <p className="text-sm text-gray-600 mb-2">Promotional Details</p>
-                      <div className="space-y-2">
-                        {formData.promoCode && (
-                          <div className="flex justify-between">
-                            <span>Promo Code</span>
-                            <span className="font-medium">{formData.promoCode}</span>
-                          </div>
-                        )}
-                        {formData.discountPercentage > 0 && (
-                          <div className="flex justify-between">
-                            <span>Discount</span>
-                            <span className="font-medium text-red-600">-{formData.discountPercentage}%</span>
-                          </div>
-                        )}
-                        {(formData.promoStartDate || formData.promoEndDate) && (
-                          <div className="flex justify-between">
-                            <span>Promotion Period</span>
-                            <span className="font-medium">{formData.promoStartDate || 'Not set'} to {formData.promoEndDate || 'Not set'}</span>
-                          </div>
-                        )}
-                        
-                        {/* Price Calculation Preview */}
-                        {formData.price > 0 && (
-                          <div className="mt-3 pt-2 border-t border-gray-100 space-y-1">
-                            <div className="flex justify-between text-sm">
-                              <span>Original Total</span>
-                              <span>₦{(formData.price + formData.services.reduce((sum, service) => {
-                                if (service.selectedCycle === 'monthly') return sum + service.monthlyPrice;
-                                if (service.selectedCycle === 'quarterly') return sum + service.quarterlyPrice;
-                                return sum + service.yearlyPrice;
-                              }, 0)).toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span>Discount Amount</span>
-                              <span className="text-red-600">-₦{Math.round(((formData.price + formData.services.reduce((sum, service) => {
-                                if (service.selectedCycle === 'monthly') return sum + service.monthlyPrice;
-                                if (service.selectedCycle === 'quarterly') return sum + service.quarterlyPrice;
-                                return sum + service.yearlyPrice;
-                              }, 0)) * formData.discountPercentage) / 100).toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between font-semibold pt-1 border-t border-gray-100">
-                              <span>Final Price</span>
-                              <span className="text-green-600">₦{Math.max(0, Math.round((formData.price + formData.services.reduce((sum, service) => {
-                                if (service.selectedCycle === 'monthly') return sum + service.monthlyPrice;
-                                if (service.selectedCycle === 'quarterly') return sum + service.quarterlyPrice;
-                                return sum + service.yearlyPrice;
-                              }, 0)) * (1 - formData.discountPercentage / 100))).toLocaleString()}</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Apply To Preview */}
-                  {(formData.applyTo.individual || formData.applyTo.industries.length > 0 || formData.applyTo.categories.length > 0) && (
-                    <div className="pt-2 border-t border-gray-200">
-                      <p className="text-sm text-gray-600 mb-2">Applies To</p>
-                      <div className="flex flex-wrap gap-2">
-                        {formData.applyTo.individual && (
-                          <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">
-                            Individual
-                          </span>
-                        )}
-                        {formData.applyTo.industries.map(industry => (
-                          <span key={industry} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
-                            Industry: {industry}
-                          </span>
-                        ))}
-                        {formData.applyTo.categories.map(category => (
-                          <span key={category} className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
-                            Category: {category}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Required Fields Note */}
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-800">
-                <strong>Note:</strong> Fields marked with * are required. At least one feature must be added.
-              </p>
-            </div>
+          
           </div>
 
           {/* Action Buttons */}
@@ -1118,6 +983,8 @@ const CreateSubscriptionPage = () => {
             </button>
           </div>
         </form>
+        
+
       </div>
     </div>
   );

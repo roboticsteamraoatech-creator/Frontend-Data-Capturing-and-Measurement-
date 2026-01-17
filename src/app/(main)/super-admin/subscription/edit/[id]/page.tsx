@@ -106,13 +106,43 @@ const EditSubscriptionPage = ({ params }: { params: Promise<{ id: string }> }) =
     
     const { name, value } = e.target;
     
+    // Skip updating services field since it's read-only
+    if (name === 'services') {
+      return;
+    }
+    
     if (name === 'price') {
-      // Ensure price is always a number
       const numValue = value === '' ? 0 : parseFloat(value);
       setPackageData(prev => prev ? {
         ...prev,
-        [name]: isNaN(numValue) ? 0 : numValue
+        price: isNaN(numValue) ? 0 : numValue
       } : null);
+    } else if (name === 'discountPercentage') {
+      if (value === '') {
+        setPackageData(prev => prev ? {
+          ...prev,
+          discountPercentage: undefined
+        } : null);
+      } else {
+        const numValue = parseFloat(value);
+        setPackageData(prev => prev ? {
+          ...prev,
+          discountPercentage: isNaN(numValue) ? undefined : numValue
+        } : null);
+      }
+    } else if (['totalServiceCost', 'discountAmount', 'finalPriceAfterDiscount'].includes(name)) {
+      if (value === '') {
+        setPackageData(prev => prev ? {
+          ...prev,
+          [name]: undefined
+        } : null);
+      } else {
+        const numValue = parseFloat(value);
+        setPackageData(prev => prev ? {
+          ...prev,
+          [name]: isNaN(numValue) ? undefined : numValue
+        } : null);
+      }
     } else {
       setPackageData(prev => prev ? {
         ...prev,
@@ -206,15 +236,17 @@ const EditSubscriptionPage = ({ params }: { params: Promise<{ id: string }> }) =
       const updateData: CreateSubscriptionPackageData = {
         title: packageData.title,
         description: packageData.description,
-        price: packageData.price,
         features: packageData.features,
         note: packageData.note || '',
-        services: packageData.services || '',
-        monthlyPrice: packageData.monthlyPrice || 0,
-        quarterlyPrice: packageData.quarterlyPrice || 0,
-        yearlyPrice: packageData.yearlyPrice || 0,
+        services: packageData.services || [],
+        promoCode: packageData.promoCode,
+        discountPercentage: packageData.discountPercentage,
         promoStartDate: packageData.promoStartDate,
-        promoEndDate: packageData.promoEndDate
+        promoEndDate: packageData.promoEndDate,
+        price: packageData.price,
+        totalServiceCost: packageData.totalServiceCost,
+        discountAmount: packageData.discountAmount,
+        finalPriceAfterDiscount: packageData.finalPriceAfterDiscount
       };
       
       // Update package using service
@@ -569,19 +601,122 @@ const EditSubscriptionPage = ({ params }: { params: Promise<{ id: string }> }) =
                   </p>
                 </div>
 
-                {/* Services */}
+                {/* Discount Percentage */}
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-700">
-                    Services
+                    Discount Percentage (%)
                   </label>
                   <input
-                    type="text"
-                    name="services"
-                    value={packageData.services || ''}
+                    type="number"
+                    name="discountPercentage"
+                    value={packageData.discountPercentage || ''}
                     onChange={handleChange}
+                    min="0"
+                    max="100"
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent transition-colors"
-                    placeholder="Enter services included"
+                    placeholder="0-100%"
                   />
+                  <p className="text-sm text-gray-500">Enter discount percentage (0-100%)</p>
+                </div>
+              </div>
+              
+              {/* Additional Pricing Details */}
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Total Service Cost</label>
+                  <input
+                    type="number"
+                    name="totalServiceCost"
+                    value={packageData.totalServiceCost || ''}
+                    onChange={handleChange}
+                    min="0"
+                    step="1"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-600 focus:border-transparent transition-colors"
+                    placeholder="0"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Total cost of all services</p>
+                </div>
+                
+                <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Discount Amount</label>
+                  <input
+                    type="number"
+                    name="discountAmount"
+                    value={packageData.discountAmount || ''}
+                    onChange={handleChange}
+                    min="0"
+                    step="1"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-600 focus:border-transparent transition-colors"
+                    placeholder="0"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Calculated discount amount</p>
+                </div>
+                
+                <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Final Price After Discount</label>
+                  <input
+                    type="number"
+                    name="finalPriceAfterDiscount"
+                    value={packageData.finalPriceAfterDiscount || ''}
+                    onChange={handleChange}
+                    min="0"
+                    step="1"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-600 focus:border-transparent transition-colors"
+                    placeholder="0"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Final price after discount</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Services Section */}
+            <div className="mb-8 bg-gray-50 rounded-xl p-6 border border-gray-200">
+              <div className="flex items-center mb-6">
+                <div className="p-2 bg-purple-100 rounded-lg mr-3">
+                  <Tag className="w-6 h-6 text-purple-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Services</h3>
+                  <p className="text-sm text-gray-600">Services included in this subscription package (read-only)</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Services Included
+                </label>
+                <div className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100">
+                  {packageData.services && packageData.services.length > 0 ? (
+                    <div className="space-y-2">
+                      {packageData.services.map((service, index) => (
+                        <div key={index} className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-white rounded border">
+                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 w-full">
+                            
+                            <div>
+                              <span className="text-gray-700 font-medium text-sm">Service Name:</span>
+                              <p className="text-gray-900 text-sm">
+                                {service.serviceName}
+                              </p>
+                            </div>
+                            <div>
+                              <span className="text-gray-700 font-medium text-sm">Duration:</span>
+                              <p className="text-gray-900 capitalize text-sm">
+                                {service.duration}
+                              </p>
+                            </div>
+                            <div>
+                              <span className="text-gray-700 font-medium text-sm">Price:</span>
+                              <p className="text-gray-900 text-sm font-medium">
+                                {formatCurrency(service.price)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 italic">No services assigned</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -630,12 +765,7 @@ const EditSubscriptionPage = ({ params }: { params: Promise<{ id: string }> }) =
               </div>
             </div>
 
-            {/* Required Fields Note */}
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-800">
-                <strong>Note:</strong> Fields marked with * are required. At least one feature must be added.
-              </p>
-            </div>
+            
           </div>
 
           {/* Action Buttons */}

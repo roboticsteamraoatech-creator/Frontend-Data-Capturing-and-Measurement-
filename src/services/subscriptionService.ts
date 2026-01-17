@@ -8,23 +8,33 @@ export interface SubscriptionPackage {
   _id?: string; // For MongoDB compatibility
   title: string;
   description: string;
-  price: number;
+  services: Array<{ 
+    serviceId: string;
+    serviceName: string;
+    duration: 'monthly' | 'quarterly' | 'yearly';
+    price: number;
+    _id?: string;
+  }>;
+  totalServiceCost?: number;
+  promoCode?: string;
+  discountPercentage?: number;
+  promoStartDate?: string;
+  promoEndDate?: string;
+  discountAmount?: number;
+  finalPriceAfterDiscount?: number;
   features: string[];
   note?: string;
-  services?: string;
+  price: number;
   monthlyPrice?: number;
   quarterlyPrice?: number;
   yearlyPrice?: number;
   setupDate?: string;
-  promoStartDate?: string;
-  promoEndDate?: string;
   updatedDate?: string;
   status: 'active' | 'inactive';
   isActive?: boolean; // Some APIs use isActive instead of status
   subscriberCount?: number;
   createdAt: string;
   updatedAt: string;
-  promoCode?: string;
   // Additional fields from API
   createdBy?: string;
   __v?: number; // MongoDB version key
@@ -47,15 +57,26 @@ export interface SubscriptionPackageFormData extends SubscriptionPackage {
 export interface CreateSubscriptionPackageData {
   title: string;
   description: string;
-  price: number;
-  features: string[];
-  note?: string;
-  services?: string;
-  monthlyPrice?: number;
-  quarterlyPrice?: number;
-  yearlyPrice?: number;
+  services: Array<{
+    serviceId: string;
+    duration: 'monthly' | 'quarterly' | 'yearly';
+  }>;
+  promoCode?: string;
+  discountPercentage?: number;
   promoStartDate?: string;
   promoEndDate?: string;
+  features: string[];
+  note?: string;
+  price?: number; // Will be calculated automatically
+  totalServiceCost?: number;
+  discountAmount?: number;
+  finalPriceAfterDiscount?: number;
+  // Optional field not included in the basic interface
+  // applyTo?: {
+  //   individual: boolean;
+  //   industries: string[];
+  //   categories: string[];
+  // };
 }
 
 // Interface for updating subscription status
@@ -67,7 +88,32 @@ export interface UpdateSubscriptionStatusData {
 interface SubscriptionPackageResponse {
   success: boolean;
   data: {
-    package: SubscriptionPackage;
+    package: {
+      _id: string;
+      title: string;
+      description: string;
+      services: Array<{ 
+        serviceId: string;
+        serviceName: string;
+        duration: 'monthly' | 'quarterly' | 'yearly';
+        price: number;
+        _id?: string;
+      }>;
+      totalServiceCost?: number;
+      promoCode?: string;
+      discountPercentage?: number;
+      promoStartDate?: string;
+      promoEndDate?: string;
+      discountAmount?: number;
+      finalPriceAfterDiscount?: number;
+      features: string[];
+      note?: string;
+      isActive: boolean;
+      createdBy?: string;
+      createdAt: string;
+      updatedAt: string;
+      __v?: number;
+    };
     message?: string;
   };
 }
@@ -75,29 +121,39 @@ interface SubscriptionPackageResponse {
 interface SubscriptionPackagesResponse {
   success: boolean;
   data: {
-    packages: Array<{
+    packages: Array<{ 
       _id: string;
       title: string;
       description: string;
-      price: number;
+      services: Array<{
+        serviceId: string;
+        serviceName: string;
+        duration: 'monthly' | 'quarterly' | 'yearly';
+        price: number;
+        _id?: string;
+      }>;
+      totalServiceCost?: number;
+      promoCode?: string;
+      discountPercentage?: number;
+      promoStartDate?: string;
+      promoEndDate?: string;
+      discountAmount?: number;
+      finalPriceAfterDiscount?: number;
       features: string[];
       note?: string;
-      services?: string;
+      price: number;
       monthlyPrice?: number;
       quarterlyPrice?: number;
       yearlyPrice?: number;
       setupDate?: string;
-      promoStartDate?: string;
-      promoEndDate?: string;
       updatedDate?: string;
       isActive?: boolean;
       subscriberCount?: number;
       createdAt: string;
       updatedAt: string;
-      promoCode?: string;
       createdBy?: string;
       __v?: number;
-    }>;
+    }>; 
     total: number;
     message?: string;
   };
@@ -117,23 +173,27 @@ class SubscriptionService {
       _id: pkg._id,
       title: pkg.title || '',
       description: pkg.description || '',
-      price: pkg.price || 0,
+      services: Array.isArray(pkg.services) ? pkg.services : [],
+      totalServiceCost: pkg.totalServiceCost,
+      promoCode: pkg.promoCode,
+      discountPercentage: pkg.discountPercentage,
+      promoStartDate: pkg.promoStartDate,
+      promoEndDate: pkg.promoEndDate,
+      discountAmount: pkg.discountAmount,
+      finalPriceAfterDiscount: pkg.finalPriceAfterDiscount,
       features: Array.isArray(pkg.features) ? pkg.features : [],
       note: pkg.note,
-      services: pkg.services,
+      price: pkg.price || pkg.finalPriceAfterDiscount || 0,
       monthlyPrice: pkg.monthlyPrice,
       quarterlyPrice: pkg.quarterlyPrice,
       yearlyPrice: pkg.yearlyPrice,
       setupDate: pkg.setupDate,
-      promoStartDate: pkg.promoStartDate,
-      promoEndDate: pkg.promoEndDate,
       updatedDate: pkg.updatedDate,
       status: pkg.isActive ? 'active' : 'inactive', // Convert isActive to status
       isActive: pkg.isActive,
       subscriberCount: pkg.subscriberCount,
       createdAt: pkg.createdAt || new Date().toISOString(),
       updatedAt: pkg.updatedAt || new Date().toISOString(),
-      promoCode: pkg.promoCode,
       createdBy: pkg.createdBy,
       __v: pkg.__v
     };
@@ -213,7 +273,17 @@ class SubscriptionService {
   async updateSubscriptionPackage(id: string, data: Partial<CreateSubscriptionPackageData>): Promise<SubscriptionPackage> {
     try {
       const url = routes.updateSubscriptionPackage(id);
-      const response = await this.httpService.putData<SubscriptionPackageResponse>(data, url);
+      
+      // Clean the data to remove undefined values
+      const cleanedData: any = {};
+      Object.keys(data).forEach(key => {
+        const value = data[key as keyof CreateSubscriptionPackageData];
+        if (value !== undefined && value !== null) {
+          cleanedData[key] = value;
+        }
+      });
+      
+      const response = await this.httpService.putData<SubscriptionPackageResponse>(cleanedData, url);
       
       if (response.success) {
         return this.transformPackage(response.data.package);

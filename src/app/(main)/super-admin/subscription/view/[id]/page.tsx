@@ -205,10 +205,36 @@ const ViewSubscriptionPage = ({ params }: { params: Promise<{ id: string }> }) =
                 </div>
               )}
 
-              {packageData.services && (
+              {packageData.services && packageData.services.length > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Services Included</label>
-                  <p className="text-gray-900">{packageData.services}</p>
+                  <div className="space-y-2">
+                    {Array.isArray(packageData.services) && packageData.services.map((service, index) => (
+                      <div key={index} className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-white rounded border">
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 w-full">
+                          
+                          <div>
+                            <span className="text-gray-700 font-medium text-sm">Service Name:</span>
+                            <p className="text-gray-900 text-sm">
+                              {service.serviceName}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-gray-700 font-medium text-sm">Duration:</span>
+                            <p className="text-gray-900 capitalize text-sm">
+                              {service.duration}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-gray-700 font-medium text-sm">Price:</span>
+                            <p className="text-gray-900 text-sm font-medium">
+                              {formatCurrency(service.price)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -219,38 +245,27 @@ const ViewSubscriptionPage = ({ params }: { params: Promise<{ id: string }> }) =
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Pricing</h2>
             
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Subscription Price</label>
-                <p className="text-xl font-semibold text-gray-900">{formatCurrency(packageData.price)}</p>
-              </div>
-
-              {(packageData.monthlyPrice || packageData.quarterlyPrice || packageData.yearlyPrice) && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Alternative Pricing</label>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    {packageData.monthlyPrice && packageData.monthlyPrice > 0 && (
-                      <div className="p-3 border border-gray-200 rounded">
-                        <p className="text-sm text-gray-600">Monthly</p>
-                        <p className="text-lg font-medium text-gray-900">{formatCurrency(packageData.monthlyPrice)}</p>
-                      </div>
-                    )}
-                    
-                    {packageData.quarterlyPrice && packageData.quarterlyPrice > 0 && (
-                      <div className="p-3 border border-gray-200 rounded">
-                        <p className="text-sm text-gray-600">Quarterly</p>
-                        <p className="text-lg font-medium text-gray-900">{formatCurrency(packageData.quarterlyPrice)}</p>
-                      </div>
-                    )}
-                    
-                    {packageData.yearlyPrice && packageData.yearlyPrice > 0 && (
-                      <div className="p-3 border border-gray-200 rounded">
-                        <p className="text-sm text-gray-600">Yearly</p>
-                        <p className="text-lg font-medium text-gray-900">{formatCurrency(packageData.yearlyPrice)}</p>
-                      </div>
-                    )}
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
+                  <p className="text-sm text-gray-600">Total Service Cost</p>
+                  <p className="text-lg font-semibold text-gray-900">{packageData.totalServiceCost !== undefined ? formatCurrency(packageData.totalServiceCost) : 'N/A'}</p>
                 </div>
-              )}
+                
+                <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
+                  <p className="text-sm text-gray-600">Final Price After Discount</p>
+                  <p className="text-lg font-semibold text-green-600">{packageData.finalPriceAfterDiscount !== undefined ? formatCurrency(packageData.finalPriceAfterDiscount) : 'N/A'}</p>
+                </div>
+                
+                <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
+                  <p className="text-sm text-gray-600">Discount Amount</p>
+                  <p className="text-lg font-semibold text-red-600">{packageData.discountAmount !== undefined ? formatCurrency(packageData.discountAmount) : 'N/A'}</p>
+                </div>
+                
+                <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
+                  <p className="text-sm text-gray-600">Subscription Price</p>
+                  <p className="text-lg font-semibold text-gray-900">{formatCurrency(packageData.price)}</p>
+                </div>
+              </div>
             </div>
           </div>
 
