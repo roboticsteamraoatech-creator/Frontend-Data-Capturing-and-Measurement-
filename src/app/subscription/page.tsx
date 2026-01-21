@@ -67,18 +67,6 @@ interface SubscriptionPackage {
   totalServiceCost?: number;
 }
 
-// Using the User interface from AuthContext
-// export interface User {
-//   id: string;
-//   email: string;
-//   fullName: string;
-//   phoneNumber: string | null;
-//   role: string;
-//   isAdmin: boolean;
-//   isVerified: boolean;
-//   createdAt: string;
-//   updatedAt: string;
-// }
 
 const SubscriptionPage: React.FC = () => {
   const { packages: apiPackages, loading, error } = useSubscriptionPackages();
@@ -92,12 +80,11 @@ const SubscriptionPage: React.FC = () => {
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false)
   const [userLimitError, setUserLimitError] = useState<string | null>(null)
   const [packageUserCounts, setPackageUserCounts] = useState<Record<string, number>>({})
+  const [paymentInitializationError, setPaymentInitializationError] = useState<string | null>(null);
 
-  // Map API packages to our local format
+
   const packages: SubscriptionPackage[] = apiPackages?.map(pkg => {
-    // Use the pricing as provided by the API
-    // finalPriceAfterDiscount is what the user should pay after discount
-    // totalServiceCost is the original price before discount
+   
     const monthlyPrice = pkg.finalPriceAfterDiscount !== undefined && pkg.finalPriceAfterDiscount !== 0 ? 
       pkg.finalPriceAfterDiscount : pkg.totalServiceCost || 0;
     const quarterlyPrice = pkg.finalPriceAfterDiscount !== undefined && pkg.finalPriceAfterDiscount !== 0 ? 
@@ -157,27 +144,30 @@ const SubscriptionPage: React.FC = () => {
   }
 
   const handlePayment = async () => {
+   
+    setPaymentInitializationError(null);
+    
     if (Object.keys(selectedPackages).length === 0) {
       alert("Please select at least one package to proceed with payment");
       return;
     }
 
-    // Get the first selected package for payment initialization
+    
     const [firstPackageId, subscriptionDuration] = Object.entries(selectedPackages)[0];
     
-    // Double-check that user is authenticated
+    
     const currentUser = authContext.user;
     if (!authContext.token) {
       alert("User not authenticated. Please log in.");
-      // Force a refresh of auth state
+      
       window.location.reload();
       return;
     }
     
-    // If currentUser is not available from context, try to extract from token
+    
     let paymentUserData = currentUser;
     if (!currentUser || !currentUser.email || !currentUser.fullName) {
-      // Try to get user data from localStorage if context doesn't have complete data
+      
       if (typeof window !== 'undefined') {
         const storedUserStr = localStorage.getItem('user');
         if (storedUserStr) {
@@ -193,7 +183,7 @@ const SubscriptionPage: React.FC = () => {
       }
     }
     
-    // Final check if we have required user data
+ 
     if (!paymentUserData || !paymentUserData.email || !paymentUserData.fullName) {
       console.error('Required user fields missing after all attempts:', {
         currentUser: currentUser,
@@ -206,13 +196,13 @@ const SubscriptionPage: React.FC = () => {
     setIsProcessingPayment(true);
     
     try {
-      // Prepare payment initialization request
+     
       const selectedPackage = packages.find(p => p.id === firstPackageId);
       
-      // Get the number of users from the state for this package
+      
       const numberOfUsers = packageUserCounts[firstPackageId] || selectedPackage?.maxUsers || 1;
       
-      // Validate number of users against maxUsers
+      
       if (selectedPackage?.maxUsers && numberOfUsers > selectedPackage.maxUsers) {
         setUserLimitError(`Number of users (${numberOfUsers}) exceeds the maximum allowed (${selectedPackage.maxUsers}) for this package.`);
         setIsProcessingPayment(false);
@@ -238,12 +228,12 @@ const SubscriptionPage: React.FC = () => {
       }
       
       const paymentRequest = {
-        userId: paymentUserData?.id as string, // Use the id from the User interface
-        userType: 'organization' as const, // Could be dynamic based on user type
+        userId: paymentUserData?.id as string, 
+        userType: 'organization' as const, 
         packageId: firstPackageId,
         subscriptionDuration,
-        amount: amountToCharge, // Use the appropriate price based on discount
-        maxUsers: numberOfUsers, // Use the number of users entered by the user
+        amount: amountToCharge, 
+        maxUsers: numberOfUsers, 
         email: paymentUserData?.email || '',
         name: paymentUserData?.fullName || '',
         phone: paymentUserData?.phoneNumber || ''
@@ -251,19 +241,23 @@ const SubscriptionPage: React.FC = () => {
       
 
       
-      // Initialize payment with Flutterwave
+   
       const response = await PaymentService.initializePayment(paymentRequest);
       
       if (response.success) {
-        // Redirect to payment link
+       
+        setPaymentInitializationError(null);
+       
         window.location.href = response.data.paymentLink;
       } else {
-        alert(`Payment initialization failed: ${response.message}`);
+       
+        setPaymentInitializationError(response.message || 'Payment initialization failed');
         setIsProcessingPayment(false);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error initializing payment:', error);
-      alert('An error occurred while initializing payment. Please try again.');
+      
+      setPaymentInitializationError(error.message || 'An error occurred while initializing payment. Please try again.');
     } finally {
       setIsProcessingPayment(false);
     }
@@ -491,6 +485,12 @@ const SubscriptionPage: React.FC = () => {
             {userLimitError && (
               <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
                 <strong>Error:</strong> {userLimitError}
+              </div>
+            )}
+
+            {paymentInitializationError && (
+              <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+                <strong>Error:</strong> {paymentInitializationError}
               </div>
             )}
 
