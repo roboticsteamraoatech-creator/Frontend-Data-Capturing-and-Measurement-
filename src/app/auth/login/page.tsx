@@ -104,10 +104,10 @@ export default function LoginPage() {
         } else if (userRole === 'organisation' || userRole === 'organization' || userRole === 'admin') {
           toast({ 
             title: "LOGIN SUCCESSFUL!",
-            description: "Redirecting to subscription page..."
+            description: "Checking subscription status..."
           })
-          // Redirect organizations to subscription page instead of admin dashboard
-          router.replace("/subscription")
+          // The SubscriptionGuard will handle redirecting to subscription if needed
+          router.replace("/admin")
         } else {
           toast({ 
             title: "LOGIN SUCCESSFUL!",

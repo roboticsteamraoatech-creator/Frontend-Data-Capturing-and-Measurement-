@@ -1,65 +1,55 @@
-// services/mockSubscriptionService.ts
-// Mock service to track admin subscription status
+// Mock subscription service for development
+// This will be replaced with actual API calls when backend is ready
 
-interface SubscriptionStatus {
-  hasActiveSubscription: boolean;
-  subscriptionExpiry?: string;
-  modulesAccess: string[];
-  selectedPackages: string[];
+interface Subscription {
+  id: string;
+  userId: string;
+  packageId: string;
+  packageName: string;
+  status: 'active' | 'inactive' | 'expired';
+  startDate: string;
+  endDate: string;
+  paymentStatus: 'completed' | 'pending' | 'failed';
 }
 
 class MockSubscriptionService {
-  private storageKey = 'adminSubscriptionStatus';
-
-  // Get current subscription status
-  getSubscriptionStatus(): SubscriptionStatus {
-    const stored = localStorage.getItem(this.storageKey);
-    if (stored) {
-      return JSON.parse(stored);
+  private subscriptions: Subscription[] = [
+    // Mock data - in real implementation, this would come from API
+    {
+      id: 'sub_1',
+      userId: 'user_1',
+      packageId: 'pkg_1',
+      packageName: 'Basic Package',
+      status: 'active',
+      startDate: '2024-01-01',
+      endDate: '2024-12-31',
+      paymentStatus: 'completed'
     }
+  ];
+
+  // Check if user has active subscription
+  hasActiveSubscription(userId: string): boolean {
+    const userSubscriptions = this.subscriptions.filter(sub => sub.userId === userId);
+    return userSubscriptions.some(sub => 
+      sub.status === 'active' && sub.paymentStatus === 'completed'
+    );
+  }
+
+  // Get all subscriptions for user
+  getUserSubscriptions(userId: string): Subscription[] {
+    return this.subscriptions.filter(sub => sub.userId === userId);
+  }
+
+  // Check if user has access to specific module/package
+  hasModuleAccess(userId: string, moduleId: string): boolean {
+    const activeSubscriptions = this.subscriptions.filter(sub => 
+      sub.userId === userId && 
+      sub.status === 'active' && 
+      sub.paymentStatus === 'completed'
+    );
     
-    // Default: no active subscription
-    return {
-      hasActiveSubscription: false,
-      modulesAccess: [],
-      selectedPackages: []
-    };
-  }
-
-  // Set subscription status
-  setSubscriptionStatus(status: SubscriptionStatus): void {
-    localStorage.setItem(this.storageKey, JSON.stringify(status));
-  }
-
-  // Check if admin has access to a specific module
-  hasModuleAccess(moduleName: string): boolean {
-    const status = this.getSubscriptionStatus();
-    return status.hasActiveSubscription && 
-           (status.modulesAccess.includes(moduleName) || status.modulesAccess.includes('all'));
-  }
-
-  // Check if admin has any active subscription
-  hasActiveSubscription(): boolean {
-    const status = this.getSubscriptionStatus();
-    return status.hasActiveSubscription;
-  }
-
-  // Mock payment processing
-  processPayment(selectedPackages: string[]): SubscriptionStatus {
-    const newStatus: SubscriptionStatus = {
-      hasActiveSubscription: true,
-      subscriptionExpiry: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year from now
-      modulesAccess: ['body-measurement', 'object-dimension', 'questionaire', 'users', 'role-management', 'group-management', 'subscription'],
-      selectedPackages: selectedPackages
-    };
-    
-    this.setSubscriptionStatus(newStatus);
-    return newStatus;
-  }
-
-  // Get available modules
-  getAvailableModules(): string[] {
-    return ['body-measurement', 'object-dimension', 'questionaire', 'users', 'role-management', 'group-management', 'subscription'];
+    // In real implementation, check if any subscription includes the module
+    return activeSubscriptions.length > 0;
   }
 }
 

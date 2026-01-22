@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Sidebar from "@/components/staff/Sidebar";
 import { StaffAuthProvider } from "@/contexts/StaffAuthContext";
+import SubscriptionGuard from "@/components/SubscriptionGuard";
 
 export default function StaffLayout({
   children,
@@ -25,14 +26,16 @@ export default function StaffLayout({
   };
 
   return (
-    <StaffAuthProvider>
-      <div className="min-h-screen relative">
-        <Sidebar user={mockUser} onShow={showSidebar} setShow={setShowSidebar} />
-        
-        <div className="relative w-full pt-0 md:pt-0">
-          {children}
+    <SubscriptionGuard>
+      <StaffAuthProvider>
+        <div className="min-h-screen relative">
+          <Sidebar user={mockUser} onShow={showSidebar} setShow={setShowSidebar} />
+          
+          <div className="relative w-full pt-0 md:pt-0">
+            {children}
+          </div>
         </div>
-      </div>
-    </StaffAuthProvider>
+      </StaffAuthProvider>
+    </SubscriptionGuard>
   );
 }
