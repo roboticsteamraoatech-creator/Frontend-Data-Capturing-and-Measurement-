@@ -1,40 +1,104 @@
-// components/SubscriptionGuard.tsx
-import React, { useEffect } from 'react';
+"use client";
+
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuthContext } from '@/AuthContext';
+import axios from 'axios';
 import { mockSubscriptionService } from '@/services/mockSubscriptionService';
 
 interface SubscriptionGuardProps {
   children: React.ReactNode;
-  moduleName?: string; // Optional: specific module name to check
 }
 
-const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children, moduleName }) => {
+const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
   const router = useRouter();
+  const { token, user } = useAuthContext();
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
 
   useEffect(() => {
-    const checkSubscription = () => {
-      // Check if user has active subscription
-      const hasSubscription = mockSubscriptionService.hasActiveSubscription();
-      
-      // If no subscription, redirect to subscription page
-      if (!hasSubscription) {
-        router.replace('/subscription');
+    const checkSubscriptionStatus = async () => {
+      // Skip check if no token or user
+      if (!token || !user) {
+        setIsLoading(false);
         return;
       }
 
-      // If checking specific module access
-      if (moduleName && !mockSubscriptionService.hasModuleAccess(moduleName)) {
-        // Redirect to subscription page if no access to specific module
-        router.replace('/subscription');
+      // Skip for super admin users
+      const userRole = user.role?.toLowerCase();
+      if (userRole === 'super_admin') {
+        setHasActiveSubscription(true);
+        setIsLoading(false);
         return;
+      }
+
+      // For organization/admin users, check if they have any subscription
+      if (userRole === 'organisation' || userRole === 'organization' || userRole === 'admin') {
+        try {
+          // First try the real API
+          const response = await axios.get(
+            `${process.env.NEXT_PUBLIC_BACKEND_API || 'https://datacapture-backend.onrender.com'}/api/subscriptions/user/${user.id}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+
+          if (response.data.success) {
+            const subscriptions = response.data.data.subscriptions || [];
+            // Check if user has any active or completed subscription
+            const hasValidSubscription = subscriptions.some((sub: any) => 
+              sub.status === 'active' || sub.paymentStatus === 'completed'
+            );
+            
+            setHasActiveSubscription(hasValidSubscription);
+          } else {
+            // Fallback to mock service
+            setHasActiveSubscription(mockSubscriptionService.hasActiveSubscription(user.id));
+          }
+        } catch (error) {
+          console.error('Error checking subscription status via API:', error);
+          // Fallback to mock service when API fails
+          setHasActiveSubscription(mockSubscriptionService.hasActiveSubscription(user.id));
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        // For other user types, no subscription check needed
+        setHasActiveSubscription(true);
+        setIsLoading(false);
       }
     };
 
-    checkSubscription();
-  }, [moduleName, router]);
+    checkSubscriptionStatus();
+  }, [token, user]);
 
-  // For now, just return children - the useEffect handles the redirect
-  // In a real implementation, we might want to show a loading state while checking
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#5D2A8B]"></div>
+      </div>
+    );
+  }
+
+  // If user has active subscription, show protected content
+  if (hasActiveSubscription) {
+    return <>{children}</>;
+  }
+
+  // If user doesn't have active subscription, redirect to subscription page
+  if (token && user && !hasActiveSubscription) {
+    const userRole = user.role?.toLowerCase();
+    if (userRole === 'organisation' || userRole === 'organization' || userRole === 'admin') {
+      router.replace('/subscription');
+      return null;
+    }
+  }
+
+  // For other cases, show children (unprotected routes)
   return <>{children}</>;
 };
 
