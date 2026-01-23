@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Building, Globe, MapPin, Search, ChevronDown, Plus, Layers } from "lucide-react";
-import { Country, State, City } from 'country-state-city';
 
 interface LocationData {
   locationType: 'headquarters' | 'branch';
@@ -33,6 +32,19 @@ interface SearchableLocationFormProps {
   isProcessing: boolean;
   onAddAnotherLocation?: () => void;
   fieldErrors?: Record<string, string>;
+  statesForCountry?: any[];
+  lgasForState?: any[];
+  citiesForLga?: any[];
+  cityRegionsForCity?: any[];
+  loadingStates?: boolean;
+  loadingLgas?: boolean;
+  loadingCities?: boolean;
+  loadingCityRegions?: boolean;
+  // Functions for cascading dropdowns
+  handleStateChange?: (countryName: string) => void;
+  handleLgaChange?: (stateName: string) => void;
+  handleCityChange?: (lga: string) => void;
+  handleCityRegionChange?: (city: string) => void;
 }
 
 const SearchableLocationForm: React.FC<SearchableLocationFormProps> = ({
@@ -45,23 +57,41 @@ const SearchableLocationForm: React.FC<SearchableLocationFormProps> = ({
   handleCancel,
   isProcessing,
   onAddAnotherLocation,
-  fieldErrors
+  fieldErrors,
+  statesForCountry = [],
+  lgasForState = [],
+  citiesForLga = [],
+  cityRegionsForCity = [],
+  loadingStates = false,
+  loadingLgas = false,
+  loadingCities = false,
+  loadingCityRegions = false,
+  handleStateChange,
+  handleLgaChange,
+  handleCityChange,
+  handleCityRegionChange
 }) => {
   
   // State variables for dropdowns and search
   const [countries, setCountries] = useState<any[]>([]);
   const [states, setStates] = useState<any[]>([]);
+  const [lgas, setLgas] = useState<any[]>([]);
   const [cities, setCities] = useState<any[]>([]);
+  const [cityRegions, setCityRegions] = useState<any[]>([]);
   
   // Dropdown states
   const [countryDropdownOpen, setCountryDropdownOpen] = useState(false);
   const [stateDropdownOpen, setStateDropdownOpen] = useState(false);
+  const [lgaDropdownOpen, setLgaDropdownOpen] = useState(false);
   const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
+  const [cityRegionDropdownOpen, setCityRegionDropdownOpen] = useState(false);
   
   // Search states
   const [countrySearch, setCountrySearch] = useState('');
   const [stateSearch, setStateSearch] = useState('');
+  const [lgaSearch, setLgaSearch] = useState('');
   const [citySearch, setCitySearch] = useState('');
+  const [cityRegionSearch, setCityRegionSearch] = useState('');
   
   // Manual input states
   const [showManualCountry, setShowManualCountry] = useState(false);
@@ -78,7 +108,9 @@ const SearchableLocationForm: React.FC<SearchableLocationFormProps> = ({
   // Refs for closing dropdowns on outside click
   const countryRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef<HTMLDivElement>(null);
+  const lgaRef = useRef<HTMLDivElement>(null);
   const cityRef = useRef<HTMLDivElement>(null);
+  const cityRegionRef = useRef<HTMLDivElement>(null);
   
   // Load initial data
   useEffect(() => {
@@ -88,76 +120,169 @@ const SearchableLocationForm: React.FC<SearchableLocationFormProps> = ({
   // Load states when country changes
   useEffect(() => {
     if (currentLocation?.country) {
-      const country = countries.find(c => c.name === currentLocation.country);
-      if (country?.isoCode) {
-        loadStates(country.isoCode);
-      }
+      loadStates(currentLocation.country);
     }
-  }, [currentLocation?.country, countries]);
+  }, [currentLocation?.country]);
 
-  // Load cities when state changes
+  // Load LGAs when state changes
   useEffect(() => {
-    if (currentLocation?.state && currentLocation?.country) {
-      const country = countries.find(c => c.name === currentLocation.country);
-      if (country?.isoCode) {
-        const state = states.find(s => s.name === currentLocation.state);
-        if (state?.isoCode) {
-          loadCities(country.isoCode, state.isoCode);
-        }
-      }
+    if (currentLocation?.country && currentLocation?.state) {
+      loadLGAs(currentLocation.country, currentLocation.state);
     }
-  }, [currentLocation?.state, currentLocation?.country, countries, states]);
+  }, [currentLocation?.country, currentLocation?.state]);
+
+  // Load cities when LGA changes
+  useEffect(() => {
+    if (currentLocation?.country && currentLocation?.state && currentLocation?.lga) {
+      loadCities(currentLocation.country, currentLocation.state, currentLocation.lga);
+    }
+  }, [currentLocation?.country, currentLocation?.state, currentLocation?.lga]);
+
+  // Load city regions when city changes
+  useEffect(() => {
+       console.log('=== CURRENT LOCATION PROPS CHANGED ===');
+  console.log('Full currentLocation:', currentLocation);
+  console.log('cityRegion:', currentLocation?.cityRegion);
+  console.log('cityRegionFee:', currentLocation?.cityRegionFee);
+    if (currentLocation?.country && currentLocation?.state && currentLocation?.lga && currentLocation?.city) {
+      loadCityRegions(currentLocation.country, currentLocation.state, currentLocation.lga, currentLocation.city);
+    }
+  }, [currentLocation?.country, currentLocation?.state, currentLocation?.lga, currentLocation?.city]);
+
+
 
   const loadCountries = async () => {
     try {
-      const data = Country.getAllCountries();
-      setCountries(data);
+      // Using HttpService to call the backend API directly
+      const HttpService = (await import('../../services/HttpService')).HttpService;
+      const httpService = new HttpService();
+      
+      const result = await httpService.getData<any>('/api/locations/countries');
+      
+      if (result.success) {
+        // Convert country objects to the format expected by the component
+        const countryObjects = result.data.countries.map((country: any) => ({
+          name: typeof country === 'string' ? country : country.name,
+          isoCode: (typeof country === 'string' ? country : country.name).substring(0, 2).toUpperCase()
+        }));
+        setCountries(countryObjects);
+      } else {
+        console.error('Failed to load countries:', result.message);
+        setCountries([]); // Set to empty array if API call succeeds but returns no data
+      }
     } catch (error) {
       console.error('Error loading countries:', error);
+      setCountries([]); // Set to empty array if API call fails
     }
   };
 
-  const loadStates = async (countryCode: string) => {
+  const loadStates = async (countryName: string) => {
     try {
-      const data = State.getStatesOfCountry(countryCode);
-      setStates(data || []);
+      // Using HttpService to call the backend API directly
+      const HttpService = (await import('../../services/HttpService')).HttpService;
+      const httpService = new HttpService();
+      
+      const data = await httpService.getData<any>(`/api/locations/states?country=${encodeURIComponent(countryName)}`);
+      // Transform the response to extract just the state names
+      const stateList = data.data?.states?.map((state: any) => typeof state === 'string' ? state : state.name) || [];
+      setStates(stateList);
     } catch (error) {
       console.error('Error loading states:', error);
+      setStates([]);
     }
   };
 
-  const loadCities = async (countryCode: string, stateCode: string) => {
+  const loadLGAs = async (countryName: string, stateName: string) => {
     try {
-      const data = City.getCitiesOfState(countryCode, stateCode);
-      setCities(data || []);
+      // Using HttpService to call the backend API directly
+      const HttpService = (await import('../../services/HttpService')).HttpService;
+      const httpService = new HttpService();
+      
+      const data = await httpService.getData<any>(`/api/locations/lgas?country=${encodeURIComponent(countryName)}&state=${encodeURIComponent(stateName)}`);
+      // Transform the response to extract just the LGA names
+      const lgaList = data.data?.lgas?.map((lga: any) => typeof lga === 'string' ? lga : lga.name) || [];
+      setLgas(lgaList);
     } catch (error) {
-      console.error('Error loading cities:', error);
+      console.error('Error loading LGAs:', error);
+      setLgas([]);
     }
   };
+
+  const loadCities = async (countryName: string, stateName: string, lgaName: string) => {
+    try {
+      // Using HttpService to call the backend API directly
+      const HttpService = (await import('../../services/HttpService')).HttpService;
+      const httpService = new HttpService();
+      
+      const data = await httpService.getData<any>(`/api/locations/cities?country=${encodeURIComponent(countryName)}&state=${encodeURIComponent(stateName)}&lga=${encodeURIComponent(lgaName)}`);
+      // Transform the response to extract just the city names
+      const cityList = data.data?.cities?.map((city: any) => typeof city === 'string' ? city : city.name) || [];
+      setCities(cityList);
+    } catch (error) {
+      console.error('Error loading cities:', error);
+      setCities([]);
+    }
+  };
+
+  const loadCityRegions = async (countryName: string, stateName: string, lgaName: string, cityName: string) => {
+    try {
+      // Using HttpService to call the backend API directly
+      const HttpService = (await import('../../services/HttpService')).HttpService;
+      const httpService = new HttpService();
+      
+      const data = await httpService.getData<any>(`/api/locations/city-regions?country=${encodeURIComponent(countryName)}&state=${encodeURIComponent(stateName)}&lga=${encodeURIComponent(lgaName)}&city=${encodeURIComponent(cityName)}`);
+      // Transform the response to extract just the city region names and fees
+      const regionList = data.data?.cityRegions?.map((region: any) => ({
+        name: region.name || region,
+        fee: region.fee,
+        _id: region._id || region.name || region
+      })) || [];
+      setCityRegions(regionList);
+    } catch (error) {
+      console.error('Error loading city regions:', error);
+      setCityRegions([]);
+    }
+  };
+
+  // Note: We don't need loadStates and loadCities anymore since we're using the props passed from parent component
+  // The parent component handles the cascading loading and passes the data as props
 
   const filteredCountries = countries.filter(country =>
     country.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
     (country.isoCode && country.isoCode.toLowerCase().includes(countrySearch.toLowerCase()))
   );
 
-  const filteredStates = states.filter(state =>
-    state.name.toLowerCase().includes(stateSearch.toLowerCase()) ||
-    state.isoCode.toLowerCase().includes(stateSearch.toLowerCase())
+  const filteredStates = (states).filter(state =>
+    (typeof state === 'string' && state.toLowerCase().includes(stateSearch.toLowerCase())) ||
+    (state.name && state.name.toLowerCase().includes(stateSearch.toLowerCase())) ||
+    (state.isoCode && state.isoCode.toLowerCase().includes(stateSearch.toLowerCase()))
   );
 
-  const filteredCities = cities.filter(city =>
-    city.name.toLowerCase().includes(citySearch.toLowerCase())
+  const filteredCities = (cities).filter(city =>
+    (typeof city === 'string' && city.toLowerCase().includes(citySearch.toLowerCase())) ||
+    (city.name && city.name.toLowerCase().includes(citySearch.toLowerCase()))
+  );
+
+  const filteredLgas = (lgas).filter(lga =>
+    (typeof lga === 'string' && lga.toLowerCase().includes(lgaSearch.toLowerCase())) ||
+    (lga.name && lga.name.toLowerCase().includes(lgaSearch.toLowerCase()))
+  );
+
+  const filteredCityRegions = (cityRegions).filter(region =>
+    (region.name && region.name.toLowerCase().includes(cityRegionSearch.toLowerCase()))
   );
 
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      const refs = [countryRef, stateRef, cityRef];
+      const refs = [countryRef, stateRef, lgaRef, cityRef, cityRegionRef];
       refs.forEach(ref => {
         if (ref.current && !ref.current.contains(event.target as Node)) {
           if (ref === countryRef) setCountryDropdownOpen(false);
           if (ref === stateRef) setStateDropdownOpen(false);
+          if (ref === lgaRef) setLgaDropdownOpen(false);
           if (ref === cityRef) setCityDropdownOpen(false);
+          if (ref === cityRegionRef) setCityRegionDropdownOpen(false);
         }
       });
     };
@@ -169,6 +294,13 @@ const SearchableLocationForm: React.FC<SearchableLocationFormProps> = ({
   // Handler functions to update location data
   const updateLocationField = (field: keyof LocationData, value: any) => {
     handleLocationChange(field, value);
+  };
+
+  // Special handler to update multiple fields at once
+  const updateMultipleLocationFields = (updates: Partial<LocationData>) => {
+    Object.entries(updates).forEach(([field, value]) => {
+      handleLocationChange(field as keyof LocationData, value);
+    });
   };
 
   if (!currentLocation) return null;
@@ -263,6 +395,8 @@ const SearchableLocationForm: React.FC<SearchableLocationFormProps> = ({
                         updateLocationField('country', country.name);
                         setCountryDropdownOpen(false);
                         setCountrySearch(''); // Clear search after selection
+                        
+                        // The useEffect will handle loading states for the selected country
                       }}
                       className={`w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-50 ${
                         currentLocation.country === country.name ? 'bg-purple-500/10' : ''
@@ -394,31 +528,36 @@ const SearchableLocationForm: React.FC<SearchableLocationFormProps> = ({
                     </div>
 
                     <div className="overflow-y-auto max-h-60">
-                      {filteredStates.map((state) => (
+                      {(filteredStates || []).map((state, index) => (
                         <button
-                          key={`${state.countryCode}-${state.isoCode}`}
+                          key={`${currentLocation.country || 'country'}-${typeof state === 'string' ? state : state.name || index}`}
                           type="button"
                           onClick={() => {
-                            updateLocationField('state', state.name);
-                            setStateDropdownOpen(false);
-                            setStateSearch(''); // Clear search after selection
+                            const stateName = typeof state === 'string' ? state : state.name;
+                            if (stateName) {
+                              updateLocationField('state', stateName);
+                              setStateDropdownOpen(false);
+                              setStateSearch(''); // Clear search after selection
+                              
+                              // The useEffect will handle loading LGAs for the selected state
+                            }
                           }}
                           className={`w-full text-left px-3 py-2 hover:bg-gray-50 ${
-                            currentLocation.state === state.name ? 'bg-purple-500/10' : ''
+                            currentLocation.state === (typeof state === 'string' ? state : state.name) ? 'bg-purple-500/10' : ''
                           }`}
                         >
                           <div className="flex items-center justify-between">
-                            <div className="font-medium">{state.name}</div>
-                            {currentLocation.state === state.name && (
+                            <div className="font-medium">{typeof state === 'string' ? state : state.name}</div>
+                            {currentLocation.state === (typeof state === 'string' ? state : state.name) && (
                               <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
                             )}
                           </div>
                         </button>
                       ))}
                       
-                      {filteredStates.length === 0 && (
+                      {(filteredStates || []).length === 0 && (
                         <div className="px-3 py-2 text-gray-500 text-center">
-                          {states.length === 0 ? 'No states found for this country' : 'No results match your search'}
+                          {loadingStates ? 'Loading states...' : states.length === 0 ? 'No states found for this country' : 'No results match your search'}
                         </div>
                       )}
                     </div>
@@ -486,8 +625,8 @@ const SearchableLocationForm: React.FC<SearchableLocationFormProps> = ({
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        {/* LGA Field - Manual Entry Only */}
-        <div className="relative">
+        {/* LGA Field - Searchable Dropdown */}
+        <div ref={lgaRef} className="relative">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             LGA (Local Government Area) - Optional
           </label>
@@ -499,31 +638,98 @@ const SearchableLocationForm: React.FC<SearchableLocationFormProps> = ({
           ) : (
             <>
               <div className="space-y-3">
-                {/* Manual input for LGA */}
-                <div>
-                  <input
-                    type="text"
-                    className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    placeholder="Enter LGA name (if applicable)..."
-                    value={currentLocation.lga}
-                    onChange={(e) => updateLocationField('lga', e.target.value)}
-                  />
-                  <p className="text-sm text-gray-500 mt-2">
-                    This field is optional. Enter LGA if it exists for this location.
-                  </p>
-                </div>
-
-                {/* Alternative: Add LGA button */}
-                {!currentLocation.lga && (
+                {/* Searchable dropdown for LGA */}
+                <div className="relative">
                   <button
                     type="button"
-                    onClick={() => setShowManualLGA(!showManualLGA)}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-purple-600 hover:bg-purple-500/10 rounded-lg border border-dashed border-purple-600"
+                    onClick={() => {
+                      setLgaDropdownOpen(!lgaDropdownOpen);
+                      setCountryDropdownOpen(false);
+                      setStateDropdownOpen(false);
+                      setCityDropdownOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between p-3 border rounded-lg hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 ${fieldErrors?.lga ? 'border-red-500' : ''}`}
                   >
-                    <Building className="w-4 h-4" />
-                    Add LGA Manually
+                    <div className="flex items-center gap-3">
+                      <MapPin className="w-5 h-5 text-gray-400" />
+                      {currentLocation.lga ? (
+                        <span>{currentLocation.lga}</span>
+                      ) : (
+                        <span className="text-gray-500">Select LGA...</span>
+                      )}
+                    </div>
+                    <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${lgaDropdownOpen ? 'transform rotate-180' : ''}`} />
                   </button>
-                )}
+                  {fieldErrors?.lga && (
+                    <p className="mt-1 text-sm text-red-600">{fieldErrors.lga}</p>
+                  )}
+                  
+                  {lgaDropdownOpen && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-80 overflow-hidden">
+                      <div className="p-2 border-b">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                          <input
+                            type="text"
+                            placeholder="Search LGAs..."
+                            className="w-full pl-9 pr-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                            value={lgaSearch}
+                            onChange={(e) => setLgaSearch(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="overflow-y-auto max-h-60">
+                        {(filteredLgas || []).map((lga, index) => (
+                          <button
+                            key={`${currentLocation.state || 'state'}-${typeof lga === 'string' ? lga : lga.name || index}`}
+                            type="button"
+                            onClick={() => {
+                              const lgaName = typeof lga === 'string' ? lga : lga.name;
+                              if (lgaName) {
+                                updateLocationField('lga', lgaName);
+                                setLgaDropdownOpen(false);
+                                setLgaSearch(''); // Clear search after selection
+                                
+                                // The useEffect will handle loading cities for the selected LGA
+                              }
+                            }}
+                            className={`w-full text-left px-3 py-2 hover:bg-gray-50 ${
+                              currentLocation.lga === (typeof lga === 'string' ? lga : lga.name) ? 'bg-purple-500/10' : ''
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="font-medium">{typeof lga === 'string' ? lga : lga.name}</div>
+                              {currentLocation.lga === (typeof lga === 'string' ? lga : lga.name) && (
+                                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                        
+                        {(filteredLgas || []).length === 0 && (
+                          <div className="px-3 py-2 text-gray-500 text-center">
+                            {loadingLgas ? 'Loading LGAs...' : lgas.length === 0 ? 'No LGAs found for this state' : 'No results match your search'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <p className="text-sm text-gray-500 mt-2">
+                  This field is optional. Select LGA if it exists for this location.
+                </p>
+
+                {/* Alternative: Add LGA button */}
+                <button
+                  type="button"
+                  onClick={() => setShowManualLGA(!showManualLGA)}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-purple-600 hover:bg-purple-500/10 rounded-lg border border-dashed border-purple-600"
+                >
+                  <Building className="w-4 h-4" />
+                  Add LGA Manually
+                </button>
 
                 {showManualLGA && (
                   <div className="p-4 border rounded-lg bg-blue-50">
@@ -625,31 +831,36 @@ const SearchableLocationForm: React.FC<SearchableLocationFormProps> = ({
                     </div>
 
                     <div className="overflow-y-auto max-h-60">
-                      {filteredCities.map((city) => (
+                      {(filteredCities || []).map((city, index) => (
                         <button
-                          key={`${city.countryCode}-${city.stateCode}-${city.name}`}
+                          key={`${currentLocation.state || 'state'}-${typeof city === 'string' ? city : city.name || index}`}
                           type="button"
                           onClick={() => {
-                            updateLocationField('city', city.name);
-                            setCityDropdownOpen(false);
-                            setCitySearch(''); // Clear search after selection
+                            const cityName = typeof city === 'string' ? city : city.name;
+                            if (cityName) {
+                              updateLocationField('city', cityName);
+                              setCityDropdownOpen(false);
+                              setCitySearch(''); // Clear search after selection
+                              
+                              // The useEffect will handle loading city regions for the selected city
+                            }
                           }}
                           className={`w-full text-left px-3 py-2 hover:bg-gray-50 ${
-                            currentLocation.city === city.name ? 'bg-purple-500/10' : ''
+                            currentLocation.city === (typeof city === 'string' ? city : city.name) ? 'bg-purple-500/10' : ''
                           }`}
                         >
                           <div className="flex items-center justify-between">
-                            <div className="font-medium">{city.name}</div>
-                            {currentLocation.city === city.name && (
+                            <div className="font-medium">{typeof city === 'string' ? city : city.name}</div>
+                            {currentLocation.city === (typeof city === 'string' ? city : city.name) && (
                               <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
                             )}
                           </div>
                         </button>
                       ))}
                       
-                      {filteredCities.length === 0 && (
+                      {(cities || []).length === 0 && (
                         <div className="px-3 py-2 text-gray-500 text-center">
-                          {cities.length === 0 ? 'No cities found for this state' : 'No results match your search'}
+                          {loadingCities ? 'Loading cities...' : cities.length === 0 ? 'No cities found for this LGA' : 'No results match your search'}
                         </div>
                       )}
                     </div>
@@ -717,10 +928,10 @@ const SearchableLocationForm: React.FC<SearchableLocationFormProps> = ({
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        {/* City Region Field - Manual Entry Only */}
-        <div className="relative">
+        {/* City Region Field - Searchable Dropdown with Fees */}
+        <div ref={cityRegionRef} className="relative">
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            City Region - Optional
+            City Region with Fee - Optional
           </label>
           
           {!currentLocation.city ? (
@@ -730,71 +941,180 @@ const SearchableLocationForm: React.FC<SearchableLocationFormProps> = ({
           ) : (
             <>
               <div className="space-y-3">
-                {/* Manual input for region */}
+                {/* Searchable dropdown for city region */}
                 <div>
-                  <input
-                    type="text"
-                    className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    placeholder="Enter region/area within the city (e.g., GRA, Lekki, Yaba)..."
-                    value={currentLocation.cityRegion}
-                    onChange={(e) => updateLocationField('cityRegion', e.target.value)}
-                  />
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCityRegionDropdownOpen(!cityRegionDropdownOpen);
+                        setCountryDropdownOpen(false);
+                        setStateDropdownOpen(false);
+                        setLgaDropdownOpen(false);
+                        setCityDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between p-3 border rounded-lg hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 ${fieldErrors?.cityRegion ? 'border-red-500' : ''}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Layers className="w-5 h-5 text-gray-400" />
+                        {currentLocation.cityRegion ? (
+                          <span>{currentLocation.cityRegion} {currentLocation.cityRegionFee ? `(₦${currentLocation.cityRegionFee.toLocaleString()})` : ''}</span>
+                        ) : (
+                          <span className="text-gray-500">Select city region...</span>
+                        )}
+                      </div>
+                      <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${cityRegionDropdownOpen ? 'transform rotate-180' : ''}`} />
+                    </button>
+                    {fieldErrors?.cityRegion && (
+                      <p className="mt-1 text-sm text-red-600">{fieldErrors.cityRegion}</p>
+                    )}
+                                    
+                    {cityRegionDropdownOpen && (
+                      <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-80 overflow-hidden">
+                        <div className="p-2 border-b">
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                            <input
+                              type="text"
+                              placeholder="Search city regions..."
+                              className="w-full pl-9 pr-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                              value={cityRegionSearch}
+                              onChange={(e) => setCityRegionSearch(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                        </div>
+                  
+                        <div className="overflow-y-auto max-h-60">
+                          {(filteredCityRegions || []).map((region) => (
+                            <button
+                              key={region._id}
+                              type="button"
+                              onClick={() => {
+                                console.log('Selecting city region:', region.name, 'with fee:', region.fee);
+                                // Update both fields together to ensure consistency
+                                handleLocationChange('cityRegion', region.name);
+                                setTimeout(() => {
+                                  handleLocationChange('cityRegionFee', region.fee);
+                                }, 0);
+                                console.log('After updates - cityRegion:', currentLocation.cityRegion, 'cityRegionFee:', currentLocation.cityRegionFee);
+                                setCityRegionDropdownOpen(false);
+                                setCityRegionSearch(''); // Clear search after selection
+                              }}
+                              className={`w-full text-left px-3 py-2 hover:bg-gray-50 ${
+                                currentLocation.cityRegion === region.name ? 'bg-purple-500/10' : ''
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="font-medium">{region.name} (₦{region.fee.toLocaleString()})</div>
+                                {currentLocation.cityRegion === region.name && (
+                                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                                          
+                          {(filteredCityRegions || []).length === 0 && (
+                            <div className="px-3 py-2 text-gray-500 text-center">
+                              {loadingCityRegions ? 'Loading city regions...' : cityRegions.length === 0 ? 'No city regions found for this city' : 'No results match your search'}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
                   <p className="text-sm text-gray-500 mt-2">
-                    This field is optional. Enter specific area within the city.
+                    {loadingCityRegions ? 'Loading city regions...' : 'This field is optional. Select or enter region within the city.'}
                   </p>
                 </div>
 
-                {/* Alternative: Add Region button */}
-                {!currentLocation.cityRegion && (
-                  <button
-                    type="button"
-                    onClick={() => setShowManualRegion(!showManualRegion)}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-purple-600 hover:bg-purple-500/10 rounded-lg border border-dashed border-purple-600"
-                  >
-                    <Layers className="w-4 h-4" />
-                    Add Region Manually
-                  </button>
+                {/* Show selected region fee if available */}
+                {currentLocation.cityRegion && (cityRegions || []).some(r => (typeof r === 'string' ? r : r.name) === currentLocation.cityRegion) && (
+                  <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <p className="text-sm font-medium text-blue-800">
+                      Selected Region Fee: ₦{((cityRegions || []).find(r => (typeof r === 'string' ? r : r.name) === currentLocation.cityRegion)?.fee || 0).toLocaleString()}
+                    </p>
+                    <button 
+                      type="button" 
+                      className="text-xs text-blue-600 hover:underline mt-1"
+                      onClick={() => {
+                        // Auto-populate the fee when region is selected from the list
+                        const selectedRegion = (cityRegions || []).find(r => (typeof r === 'string' ? r : r.name) === currentLocation.cityRegion);
+                        if (selectedRegion) {
+                          updateLocationField('cityRegionFee', selectedRegion.fee);
+                        }
+                      }}
+                    >
+                      Apply Fee Automatically
+                    </button>
+                  </div>
                 )}
+
+                {/* Alternative: Add Region button */}
+                <button
+                  type="button"
+                  onClick={() => setShowManualRegion(!showManualRegion)}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-purple-600 hover:bg-purple-500/10 rounded-lg border border-dashed border-purple-600"
+                >
+                  <Layers className="w-4 h-4" />
+                  Add Region Manually
+                </button>
 
                 {showManualRegion && (
                   <div className="p-4 border rounded-lg bg-blue-50">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Add Region for {currentLocation.city}
                     </label>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col gap-2">
                       <input
                         type="text"
-                        className="flex-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 mb-2"
                         placeholder="Enter region name..."
                         value={manualRegion}
                         onChange={(e) => setManualRegion(e.target.value)}
                         autoFocus
                       />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!manualRegion.trim()) {
-                            alert('Please enter a region name');
-                            return;
-                          }
-                          updateLocationField('cityRegion', manualRegion);
-                          setShowManualRegion(false);
-                          setManualRegion('');
-                        }}
-                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-                      >
-                        Add
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowManualRegion(false);
-                          setManualRegion('');
-                        }}
-                        className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                      >
-                        Cancel
-                      </button>
+                      <input
+                        type="number"
+                        className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        placeholder="Enter fee..."
+                        value={manualRegion ? currentLocation.cityRegionFee || '' : ''}
+                        onChange={(e) => updateLocationField('cityRegionFee', Number(e.target.value))}
+                      />
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!manualRegion.trim()) {
+                              alert('Please enter a region name');
+                              return;
+                            }
+                            // Update both city region name and fee together
+                            handleLocationChange('cityRegion', manualRegion);
+                            // Set a default fee if none provided, otherwise keep the entered fee
+                            const feeValue = currentLocation.cityRegionFee !== undefined && currentLocation.cityRegionFee !== null 
+                              ? currentLocation.cityRegionFee 
+                              : 0;
+                            handleLocationChange('cityRegionFee', feeValue);
+                            setShowManualRegion(false);
+                            setManualRegion('');
+                          }}
+                          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                        >
+                          Add
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowManualRegion(false);
+                            setManualRegion('');
+                          }}
+                          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}

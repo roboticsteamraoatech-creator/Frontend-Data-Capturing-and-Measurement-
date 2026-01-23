@@ -2,24 +2,31 @@ import { HttpService } from './HttpService';
 import { routes } from './apiRoutes';
 
 interface CityRegion {
-  message: string;
   _id: string;
-  id: string;
-  country: string;
-  stateProvince: string;
-  lga: string;
-  city: string;
-  cityRegion: string;
+  name: string;
+  fee: number;
   isActive: boolean;
-  status: 'active' | 'inactive';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface Location {
+  _id: string;
+  country: string;
+  state: string;
+  lga?: string;
+  city: string;
+  cityRegions: CityRegion[];
+  isActive: boolean;
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;
   __v?: number;
   // For backward compatibility (if API returns old field names)
+  stateProvince?: string;
+  cityRegion?: string;
   countryCode?: string;
   countryName?: string;
-  stateCode?: string;
   stateName?: string;
   cityName?: string;
   region?: string;
@@ -27,10 +34,10 @@ interface CityRegion {
 
 interface CityRegionFormData {
   country: string;
-  stateProvince: string;
+  state: string;
   city: string;
   lga?: string;
-  cityRegion?: string;
+  cityRegions?: CityRegion[];
 }
 
 class CityRegionService {
@@ -48,7 +55,7 @@ class CityRegionService {
     sortOrder?: 'asc' | 'desc',
     status?: 'active' | 'inactive'
   ): Promise<{
-    regions: CityRegion[];
+    regions: Location[];
     total: number;
     page: number;
     limit: number;
@@ -58,7 +65,7 @@ class CityRegionService {
       const response = await this.httpService.getData<{ 
         success: boolean; 
         data: { 
-          regions: CityRegion[]; 
+          locations: Location[]; 
           total: number; 
           page: number; 
           limit: number; 
@@ -68,7 +75,32 @@ class CityRegionService {
       }>(routes.getCityRegions(page, limit, search, sortBy, sortOrder, status));
 
       if (response.success) {
-        return response.data;
+        // Flatten the locations and their cityRegions into a single array for backward compatibility
+        const flattenedRegions: any[] = [];
+        response.data.locations.forEach(location => {
+          if (location.cityRegions && location.cityRegions.length > 0) {
+            location.cityRegions.forEach(cityRegion => {
+              flattenedRegions.push({
+                ...location,
+                _id: cityRegion._id,
+                name: cityRegion.name,
+                fee: cityRegion.fee,
+                isActive: cityRegion.isActive
+              });
+            });
+          } else {
+            // If no city regions, still add the location as a region
+            flattenedRegions.push(location);
+          }
+        });
+        
+        return {
+          regions: flattenedRegions,
+          total: flattenedRegions.length,
+          page: response.data.page,
+          limit: response.data.limit,
+          totalPages: response.data.totalPages
+        };
       } else {
         throw new Error(response.message || 'Failed to fetch city regions');
       }
@@ -78,16 +110,16 @@ class CityRegionService {
     }
   }
 
-  async getCityRegionById(id: string): Promise<CityRegion> {
+  async getCityRegionById(id: string): Promise<Location> {
     try {
       const response = await this.httpService.getData<{ 
         success: boolean; 
-        data: { region: CityRegion };
+        data: { location: Location };
         message: string;
       }>(routes.getCityRegionById(id));
 
       if (response.success) {
-        return response.data.region;
+        return response.data.location;
       } else {
         throw new Error(response.message || 'Failed to fetch city region');
       }
@@ -97,16 +129,16 @@ class CityRegionService {
     }
   }
 
-  async createCityRegion(data: CityRegionFormData): Promise<CityRegion> {
+  async createCityRegion(data: CityRegionFormData): Promise<Location> {
     try {
       const response = await this.httpService.postData<{ 
         success: boolean; 
-        data: { region: CityRegion };
+        data: { location: Location };
         message: string;
       }>(data, routes.createCityRegion());
 
       if (response.success) {
-        return response.data.region;
+        return response.data.location;
       } else {
         throw new Error(response.message || 'Failed to create city region');
       }
@@ -116,16 +148,16 @@ class CityRegionService {
     }
   }
 
-  async updateCityRegion(id: string, data: Partial<CityRegionFormData>): Promise<CityRegion> {
+  async updateCityRegion(id: string, data: Partial<CityRegionFormData>): Promise<Location> {
     try {
       const response = await this.httpService.putData<{ 
         success: boolean; 
-        data: { region: CityRegion };
+        data: { location: Location };
         message: string;
       }>(data, routes.updateCityRegion(id));
 
       if (response.success) {
-        return response.data.region;
+        return response.data.location;
       } else {
         throw new Error(response.message || 'Failed to update city region');
       }
@@ -135,16 +167,16 @@ class CityRegionService {
     }
   }
 
-  async updateCityRegionStatus(id: string, status: 'active' | 'inactive'): Promise<CityRegion> {
+  async updateCityRegionStatus(id: string, status: 'active' | 'inactive'): Promise<Location> {
     try {
       const response = await this.httpService.putData<{ 
         success: boolean; 
-        data: { region: CityRegion };
+        data: { location: Location };
         message: string;
       }>({ status }, routes.updateCityRegionStatus(id));
 
       if (response.success) {
-        return response.data.region;
+        return response.data.location;
       } else {
         throw new Error(response.message || 'Failed to update city region status');
       }
@@ -170,4 +202,4 @@ class CityRegionService {
 }
 
 export default new CityRegionService();
-export type { CityRegion, CityRegionFormData };
+export type { Location as CityRegion, CityRegionFormData };

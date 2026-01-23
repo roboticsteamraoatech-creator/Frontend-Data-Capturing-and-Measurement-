@@ -136,19 +136,19 @@ deleteService: (id: string) => `/api/services/${id}`,
   
   // City region management routes
   getCityRegions: (page: number = 1, limit: number = 10, search?: string, sortBy?: string, sortOrder?: 'asc' | 'desc', status?: 'active' | 'inactive') => {
-    let url = `/api/city-regions?page=${page}&limit=${limit}`;
+    let url = `/api/super-admin/locations?page=${page}&limit=${limit}`;
     if (search) url += `&search=${encodeURIComponent(search)}`;
     if (sortBy) url += `&sortBy=${sortBy}`;
     if (sortOrder) url += `&sortOrder=${sortOrder}`;
     if (status) url += `&status=${status}`;
     return url;
   },
-  getCityRegionById: (id: string) => `/api/city-regions/${id}`,
-  createCityRegion: () => '/api/city-regions',
-  updateCityRegion: (id: string) => `/api/city-regions/${id}`,
-  deleteCityRegion: (id: string) => `/api/city-regions/${id}`,
-  updateCityRegionStatus: (id: string) => `/api/city-regions/${id}/status`,
-  exportCityRegions: (format: 'csv' | 'excel' | 'pdf') => `/api/city-regions/export/${format}`,
+  getCityRegionById: (id: string) => `/api/super-admin/locations/${id}`,
+  createCityRegion: () => '/api/super-admin/locations',
+  updateCityRegion: (id: string) => `/api/super-admin/locations/${id}`,
+  deleteCityRegion: (id: string) => `/api/super-admin/locations/${id}`,
+  updateCityRegionStatus: (id: string) => `/api/super-admin/locations/${id}`,
+  exportCityRegions: (format: 'csv' | 'excel' | 'pdf') => `/api/super-admin/locations/export/${format}`,
   
   scanMeasurements: () => '/api/measurements/scan'
 };

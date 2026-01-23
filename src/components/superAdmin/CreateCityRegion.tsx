@@ -172,10 +172,17 @@ const CreateCityRegionPage = () => {
     try {
       const payload = {
         country: formData.countryCode,
-        stateProvince: formData.stateCode,
+        state: formData.stateCode,
         city: formData.cityName,
         lga: formData.lga,
-        cityRegion: formData.region
+        cityRegions: [{
+          _id: '',
+          name: formData.region,
+          fee: 0, // Default fee, can be modified later
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }]
       };
 
       await CityRegionService.createCityRegion(payload);
