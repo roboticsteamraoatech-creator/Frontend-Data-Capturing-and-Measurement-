@@ -3,11 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, Edit2, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import CityRegionService, { CityRegion } from '@/services/cityRegionService';
+import CityRegionService, { CityRegion as Location } from '@/services/cityRegionService';
+import { routes } from '@/services/apiRoutes';
 
 const CityRegionPage = () => {
-  const [regions, setRegions] = useState<CityRegion[]>([]);
-  const [filteredRegions, setFilteredRegions] = useState<CityRegion[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [filteredLocations, setFilteredLocations] = useState<Location[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -19,6 +20,10 @@ const CityRegionPage = () => {
   const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
+  // City regions modal states
+  const [showCityRegionsModal, setShowCityRegionsModal] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState<Location | null>(null);
+
   // Fetch data from the API
   useEffect(() => {
     fetchRegions();
@@ -26,38 +31,64 @@ const CityRegionPage = () => {
 
   const fetchRegions = async () => {
     try {
-      const { regions } = await CityRegionService.getCityRegions(1, 100);
-      setRegions(regions);
-      setFilteredRegions(regions);
+      // Get all locations using the service
+      const response = await CityRegionService.getCityRegions(1, 100);
+      
+      // Since the service flattens data, we need to reconstruct unique locations
+      // Group the flattened regions by location ID to get unique locations
+      const locationMap = new Map<string, Location>();
+      
+      for (const item of response.regions) {
+        // Check if this is a location object with cityRegions
+        if (!locationMap.has(item._id)) {
+          // Create a location object with all the properties from the first item
+          // but with the cityRegions array intact
+          locationMap.set(item._id, {
+            ...item,
+            cityRegions: [] // We'll populate this properly below
+          });
+        }
+      }
+      
+      // Since the service flattens the data, we need to get unique locations another way
+      // Let's fetch the raw data directly using the HttpService
+      const rawData = await CityRegionService['httpService'].getData<any>(routes.getCityRegions(1, 100));
+      
+      if (rawData.success) {
+        setLocations(rawData.data.locations);
+        setFilteredLocations(rawData.data.locations);
+      } else {
+        throw new Error(rawData.message || 'Failed to fetch locations');
+      }
     } catch (error) {
-      console.error('Error fetching city regions:', error);
+      console.error('Error fetching locations:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Filter regions based on search term
+  // Filter locations based on search term
   useEffect(() => {
     if (!searchTerm) {
-      setFilteredRegions(regions);
+      setFilteredLocations(locations);
     } else {
-      const filtered = regions.filter(region =>
-        region.country?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        region.stateProvince?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        region.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (region.lga && region.lga.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (region.cityRegion && region.cityRegion.toLowerCase().includes(searchTerm.toLowerCase()))
+      const filtered = locations.filter(location =>
+        location.country?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        location.state?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        location.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (location.lga && location.lga.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (location.cityRegions && location.cityRegions.some(cr => cr.name.toLowerCase().includes(searchTerm.toLowerCase())))
       );
-      setFilteredRegions(filtered);
+      setFilteredLocations(filtered);
     }
-  }, [searchTerm, regions]);
+  }, [searchTerm, locations]);
 
   const handleCreateClick = () => {
     router.push('/super-admin/subscription/city-region/create');
   };
 
-  const handleEdit = (region: CityRegion) => {
-    router.push(`/super-admin/subscription/city-region/edit/${region._id || region.id}`);
+  const handleEdit = (location: Location) => {
+    router.push(`/super-admin/subscription/city-region/edit/${location._id}`);
   };
 
   const handleDeleteClick = (id: string) => {
@@ -92,12 +123,25 @@ const CityRegionPage = () => {
     setRegionToDelete(null);
   };
 
+  const handleViewCityRegions = (location: Location) => {
+    setCurrentLocation(location);
+    setShowCityRegionsModal(true);
+  };
+
   const formatDate = (dateString: Date | string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
     });
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: 'NGN',
+      minimumFractionDigits: 0,
+    }).format(amount);
   };
 
   if (loading) {
@@ -188,6 +232,87 @@ const CityRegionPage = () => {
         </div>
       )}
 
+      {/* City Regions Modal */}
+      {showCityRegionsModal && currentLocation && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+          <div className="absolute inset-0 bg-transparent" onClick={() => setShowCityRegionsModal(false)}></div>
+          <div className="bg-white rounded-xl shadow-lg max-w-2xl w-full p-6 relative z-10 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold text-gray-900">
+                City Regions - {currentLocation.city}, {currentLocation.state}
+              </h3>
+              <button
+                onClick={() => setShowCityRegionsModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+              <h4 className="font-medium text-gray-700 mb-2">Location Details:</h4>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div><span className="font-medium">Country:</span> {currentLocation.country}</div>
+                <div><span className="font-medium">State:</span> {currentLocation.state}</div>
+                <div><span className="font-medium">LGA:</span> {currentLocation.lga || '-'}</div>
+                <div><span className="font-medium">City:</span> {currentLocation.city}</div>
+              </div>
+            </div>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fee</th>
+                    <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {currentLocation.cityRegions && currentLocation.cityRegions.length > 0 ? (
+                    currentLocation.cityRegions.map((region, index) => (
+                      <tr key={region._id || index}>
+                        <td className="py-2 px-3 text-sm text-gray-900">{region.name}</td>
+                        <td className="py-2 px-3 text-sm text-gray-900">{formatCurrency(region.fee)}</td>
+                        <td className="py-2 px-3 text-sm">
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            region.isActive
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                              region.isActive
+                                ? 'bg-green-500'
+                                : 'bg-red-500'
+                            }`}></span>
+                            {region.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={3} className="py-4 px-3 text-center text-gray-500">
+                        No city regions found for this location
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => setShowCityRegionsModal(false)}
+                className="px-4 py-2 bg-[#5D2A8B] text-white rounded-lg hover:bg-[#4a216d] transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
           <div className="flex items-center justify-between">
@@ -196,7 +321,7 @@ const CityRegionPage = () => {
               <p className="text-gray-600">Manage city regions for verified badge subscriptions</p>
             </div>
             <div className="text-sm text-gray-500">
-              Total: <span className="font-medium">{regions.length}</span> regions
+              Total: <span className="font-medium">{locations?.length || 0}</span> locations
             </div>
           </div>
         </div>
@@ -237,63 +362,68 @@ const CityRegionPage = () => {
                   <th className="py-3 px-4 text-left text-gray-600 font-medium text-sm">State/Province</th>
                   <th className="py-3 px-4 text-left text-gray-600 font-medium text-sm">LGA</th>
                   <th className="py-3 px-4 text-left text-gray-600 font-medium text-sm">City</th>
-                  <th className="py-3 px-4 text-left text-gray-600 font-medium text-sm">City Region</th>
+                  <th className="py-3 px-4 text-left text-gray-600 font-medium text-sm">City Regions</th>
                   <th className="py-3 px-4 text-left text-gray-600 font-medium text-sm">Status</th>
                   <th className="py-3 px-4 text-left text-gray-600 font-medium text-sm">Created Date</th>
                   <th className="py-3 px-4 text-left text-gray-600 font-medium text-sm">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredRegions.length > 0 ? (
-                  filteredRegions.map((region) => {
-                    const regionId = region._id || region.id;
+                {filteredLocations && filteredLocations.length > 0 ? (
+                  filteredLocations.map((location) => {
+                    const locationId = location._id;
                     
                     return (
-                      <tr key={regionId} className="border-b border-gray-100 hover:bg-gray-50">
+                      <tr key={locationId} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="py-4 px-4">
-                          <span className="font-medium text-sm">{region.country || region.countryName || '-'}</span>
+                          <span className="font-medium text-sm">{location.country || '-'}</span>
                         </td>
                         <td className="py-4 px-4">
-                          <span className="font-medium text-sm">{region.stateProvince || region.stateName || '-'}</span>
+                          <span className="font-medium text-sm">{location.state || '-'}</span>
                         </td>
                         <td className="py-4 px-4">
-                          {region.lga ? (
-                            <span className="font-medium text-sm">{region.lga}</span>
+                          {location.lga ? (
+                            <span className="font-medium text-sm">{location.lga}</span>
                           ) : (
                             <span className="text-gray-400 text-sm">-</span>
                           )}
                         </td>
                         <td className="py-4 px-4">
-                          <span className="font-medium text-sm">{region.city || region.cityName || '-'}</span>
+                          <span className="font-medium text-sm">{location.city || '-'}</span>
                         </td>
                         <td className="py-4 px-4">
-                          {region.cityRegion || region.region ? (
-                            <span className="font-medium text-sm">{region.cityRegion || region.region}</span>
+                          {location.cityRegions && location.cityRegions.length > 0 ? (
+                            <button
+                              onClick={() => handleViewCityRegions(location)}
+                              className="text-blue-600 hover:text-blue-800 underline text-sm"
+                            >
+                              View {location.cityRegions.length} region(s)
+                            </button>
                           ) : (
-                            <span className="text-gray-400 text-sm">-</span>
+                            <span className="text-gray-400 text-sm">No regions</span>
                           )}
                         </td>
                         <td className="py-4 px-4">
                           <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            region.isActive || region.status === 'active'
+                            location.isActive
                               ? 'bg-green-100 text-green-800'
                               : 'bg-red-100 text-red-800'
                           }`}>
                             <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
-                              region.isActive || region.status === 'active'
+                              location.isActive
                                 ? 'bg-green-500'
                                 : 'bg-red-500'
                             }`}></span>
-                            {region.isActive || region.status === 'active' ? 'Active' : 'Inactive'}
+                            {location.isActive ? 'Active' : 'Inactive'}
                           </span>
                         </td>
                         <td className="py-4 px-4 text-gray-700 text-sm">
-                          {formatDate(region.createdAt)}
+                          {formatDate(location.createdAt)}
                         </td>
                         <td className="py-4 px-4">
                           <div className="flex items-center space-x-1">
                             <button
-                              onClick={() => handleEdit(region)}
+                              onClick={() => handleEdit(location)}
                               className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-md transition-colors text-xs"
                               title="Edit"
                             >
@@ -302,7 +432,7 @@ const CityRegionPage = () => {
                             </button>
                             
                             <button
-                              onClick={() => handleDeleteClick(regionId)}
+                              onClick={() => handleDeleteClick(locationId)}
                               className="flex items-center gap-1 px-2 py-1 bg-red-50 text-red-600 hover:bg-red-100 rounded-md transition-colors text-xs"
                               title="Delete"
                             >
@@ -342,11 +472,11 @@ const CityRegionPage = () => {
             </table>
           </div>
 
-          {filteredRegions.length > 0 && (
+          {filteredLocations && filteredLocations.length > 0 && (
             <div className="flex items-center justify-between p-4 border-t border-gray-200 bg-gray-50">
               <div className="text-xs text-gray-600">
-                Showing <span className="font-medium">1</span> to <span className="font-medium">{filteredRegions.length}</span> of{' '}
-                <span className="font-medium">{filteredRegions.length}</span> results
+                Showing <span className="font-medium">1</span> to <span className="font-medium">{filteredLocations.length}</span> of{' '}
+                <span className="font-medium">{filteredLocations.length}</span> results
               </div>
               <div className="flex space-x-1">
                 <button className="px-2 py-1 border border-gray-300 rounded text-gray-600 hover:bg-gray-50 disabled:opacity-50 text-xs">

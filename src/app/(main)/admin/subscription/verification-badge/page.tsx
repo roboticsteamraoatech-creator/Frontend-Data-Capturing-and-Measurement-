@@ -16,7 +16,8 @@ import {
   Users,
 } from "lucide-react";
 import OrganizationProfileService, { OrganizationProfile, LocationData } from "@/services/OrganizationProfileService";
-import { Country, State, City } from 'country-state-city';
+
+
 import SearchableLocationForm from "@/app/components/SearchableLocationForm";
 
 
@@ -95,7 +96,22 @@ const VerificationBadgeSubscriptionPage: React.FC = () => {
   
   // Initialize country data
   useEffect(() => {
-    setCountries(Country.getAllCountries());
+    const loadCountries = async () => {
+      try {
+        // Using HttpService to call the backend API directly
+        const HttpService = (await import('@/services/HttpService')).HttpService;
+        const httpService = new HttpService();
+        
+        const data = await httpService.getData<any>('/api/locations/countries');
+        // Transform the response to extract just the country names
+        setCountries(data.data?.countries?.map((country: any) => typeof country === 'string' ? country : country.name) || []);
+      } catch (error) {
+        console.error('Error loading countries:', error);
+        setCountries([]);
+      }
+    };
+    
+    loadCountries();
   }, []);
 
   const organizationProfileService = new OrganizationProfileService();
@@ -238,11 +254,8 @@ const VerificationBadgeSubscriptionPage: React.FC = () => {
             reader.readAsDataURL(file);
           });
           
-          // Upload to Cloudinary and get the secure URL
-          // We'll need to create a temporary solution since we can't import CloudinaryUploadService directly
-          // In a real implementation, we would use the actual Cloudinary service
-          // For now, we'll use a direct fetch to Cloudinary API
-          // Determine if it's an image or video to use the appropriate Cloudinary endpoint
+         
+         
           const isImage = file.type.startsWith('image/');
           const uploadEndpoint = isImage 
             ? 'https://api.cloudinary.com/v1_1/disz21zwr/image/upload'
@@ -540,10 +553,10 @@ const VerificationBadgeSubscriptionPage: React.FC = () => {
   
   const handleLocationChange = (field: keyof LocationData, value: any) => {
     if (currentLocation) {
-      setCurrentLocation({
-        ...currentLocation,
+      setCurrentLocation((prevLocation: any) => ({
+        ...prevLocation,
         [field]: value
-      });
+      }));
     }
   };
   
@@ -558,13 +571,16 @@ const VerificationBadgeSubscriptionPage: React.FC = () => {
   const handleStateChange = async (countryName: string) => {
     setLoadingStates(true);
     try {
-      const selectedCountry = countries.find(c => c.name === countryName);
-      if (selectedCountry) {
-        const countryStates = State.getStatesOfCountry(selectedCountry.isoCode);
-        setStatesForCountry(countryStates);
-      }
+      // Using HttpService to call the backend API directly
+      const HttpService = (await import('@/services/HttpService')).HttpService;
+      const httpService = new HttpService();
+      
+      const data = await httpService.getData<any>(`/api/locations/states?country=${encodeURIComponent(countryName)}`);
+      // Transform the response to extract just the state names
+      setStatesForCountry(data.data?.states?.map((state: any) => typeof state === 'string' ? state : state.name) || []);
     } catch (error) {
       console.error('Error loading states:', error);
+      setStatesForCountry([]);
     } finally {
       setLoadingStates(false);
     }
@@ -573,12 +589,17 @@ const VerificationBadgeSubscriptionPage: React.FC = () => {
   const handleLgaChange = async (stateName: string) => {
     setLoadingLgas(true);
     try {
-      // In a real app, you'd fetch LGAs from an API
-      // For now, we'll use a more general approach or allow manual entry
-      // The component already supports 'Other' functionality for manual entry
-      setLgasForState([]); // Reset to empty, let the user use 'Other' functionality
+      const countryName = currentLocation?.country || '';
+      // Using HttpService to call the backend API directly
+      const HttpService = (await import('@/services/HttpService')).HttpService;
+      const httpService = new HttpService();
+      
+      const data = await httpService.getData<any>(`/api/locations/lgas?country=${encodeURIComponent(countryName)}&state=${encodeURIComponent(stateName)}`);
+      // Transform the response to extract just the lga names
+      setLgasForState(data.data?.lgas?.map((lga: any) => typeof lga === 'string' ? lga : lga.name) || []);
     } catch (error) {
       console.error('Error loading LGAs:', error);
+      setLgasForState([]); // Reset to empty, let the user use 'Other' functionality
     } finally {
       setLoadingLgas(false);
     }
@@ -587,11 +608,18 @@ const VerificationBadgeSubscriptionPage: React.FC = () => {
   const handleCityChange = async (lga: string) => {
     setLoadingCities(true);
     try {
-      // In a real app, you'd fetch cities from an API based on LGA
-      // For now, we'll use the 'Other' functionality in the component
-      setCitiesForLga([]); // Reset to empty, let the user use 'Other' functionality
+      const countryName = currentLocation?.country || '';
+      const stateName = currentLocation?.state || '';
+      // Using HttpService to call the backend API directly
+      const HttpService = (await import('@/services/HttpService')).HttpService;
+      const httpService = new HttpService();
+      
+      const data = await httpService.getData<any>(`/api/locations/cities?country=${encodeURIComponent(countryName)}&state=${encodeURIComponent(stateName)}&lga=${encodeURIComponent(lga)}`);
+      // Transform the response to extract just the city names
+      setCitiesForLga(data.data?.cities?.map((city: any) => typeof city === 'string' ? city : city.name) || []);
     } catch (error) {
       console.error('Error loading cities:', error);
+      setCitiesForLga([]); // Reset to empty, let the user use 'Other' functionality
     } finally {
       setLoadingCities(false);
     }
@@ -600,11 +628,23 @@ const VerificationBadgeSubscriptionPage: React.FC = () => {
   const handleCityRegionChange = async (city: string) => {
     setLoadingCityRegions(true);
     try {
-      // In a real app, you'd fetch city regions from an API based on city
-      // For now, we'll use the 'Other' functionality in the component
-      setCityRegionsForCity([]); // Reset to empty, let the user use 'Other' functionality
+      const countryName = currentLocation?.country || '';
+      const stateName = currentLocation?.state || '';
+      const lgaName = currentLocation?.lga || '';
+      // Using HttpService to call the backend API directly
+      const HttpService = (await import('@/services/HttpService')).HttpService;
+      const httpService = new HttpService();
+      
+      const data = await httpService.getData<any>(`/api/locations/city-regions?country=${encodeURIComponent(countryName)}&state=${encodeURIComponent(stateName)}&lga=${encodeURIComponent(lgaName)}&city=${encodeURIComponent(city)}`);
+      // Transform the response to extract just the city region names and fees
+      setCityRegionsForCity(data.data?.cityRegions?.map((region: any) => ({
+        name: region.name || region,
+        fee: region.fee,
+        _id: region._id || region.name || region
+      })) || []);
     } catch (error) {
       console.error('Error loading city regions:', error);
+      setCityRegionsForCity([]); // Reset to empty, let the user use 'Other' functionality
     } finally {
       setLoadingCityRegions(false);
     }
@@ -770,9 +810,16 @@ const VerificationBadgeSubscriptionPage: React.FC = () => {
         <div className="mb-8">
           {/* Actions outside the container */}
           <div className="flex justify-between mb-4">
-            <a href="/admin/subscription/profile" className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
+            <a href="/admin/subscription/profile" className="px-4 py-2 bg-[#5d2a8b] text-white rounded-lg hover:bg-[#7a3aa3] transition-colors">
               Manage Profile
             </a>
+            <button 
+              onClick={handleAddLocation}
+              className="px-4 py-2 bg-[#5d2a8b] text-white rounded-lg hover:bg-[#7a3aa3] transition-colors flex items-center"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add New Location
+            </button>
           </div>
                   
           {/* Single Location Form */}
@@ -794,6 +841,18 @@ const VerificationBadgeSubscriptionPage: React.FC = () => {
                   }}
                   isProcessing={isProcessing}
                   fieldErrors={fieldErrors}
+                  statesForCountry={statesForCountry}
+                  lgasForState={lgasForState}
+                  citiesForLga={citiesForLga}
+                  cityRegionsForCity={cityRegionsForCity}
+                  loadingStates={loadingStates}
+                  loadingLgas={loadingLgas}
+                  loadingCities={loadingCities}
+                  loadingCityRegions={loadingCityRegions}
+                  handleStateChange={handleStateChange}
+                  handleLgaChange={handleLgaChange}
+                  handleCityChange={handleCityChange}
+                  handleCityRegionChange={handleCityRegionChange}
                 />
               </div>
             </div>
