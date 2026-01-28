@@ -14,11 +14,13 @@ import {
   Plus,
   MapPin,
   Users,
+  Image,
 } from "lucide-react";
 import OrganizationProfileService, { OrganizationProfile, LocationData } from "@/services/OrganizationProfileService";
 
 
 import SearchableLocationForm from "@/app/components/SearchableLocationForm";
+import GallerySection from "@/modules/admin/gallery-section";
 
 
 interface OrganizationDetails {
@@ -559,6 +561,7 @@ const VerificationBadgeSubscriptionPage: React.FC = () => {
       }));
     }
   };
+
   
 
   
@@ -808,6 +811,36 @@ const VerificationBadgeSubscriptionPage: React.FC = () => {
         
         {/* Render location form or locations table based on workflowStep */}
         <div className="mb-8">
+          {/* Gallery Section Card at the top */}
+          {workflowStep === 'locations' && (
+            <div className="mb-6 p-6 bg-white rounded-xl border border-gray-200 shadow-sm">
+              <div className="mb-4">
+                <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                  <Image className="w-6 h-6 text-[#5d2a8b]" />
+                  Organization Gallery
+                </h3>
+                <p className="text-gray-600 mt-1">
+                  Showcase your organization's products, services, and facilities with images and videos.
+                </p>
+              </div>
+              <GallerySection 
+                initialGallery={locations[0]?.gallery || { images: [], videos: [] }}
+                onGalleryChange={(gallery) => {
+                  // Handle gallery change for the first location or create a new one
+                  if (locations.length > 0) {
+                    const updatedLocations = [...locations];
+                    updatedLocations[0] = {
+                      ...updatedLocations[0],
+                      gallery
+                    };
+                    setLocations(updatedLocations);
+                  }
+                }}
+                maxItems={10}
+              />
+            </div>
+          )}
+
           {/* Actions outside the container */}
           <div className="flex justify-between mb-4">
             <a href="/admin/subscription/profile" className="px-4 py-2 bg-[#5d2a8b] text-white rounded-lg hover:bg-[#7a3aa3] transition-colors">
