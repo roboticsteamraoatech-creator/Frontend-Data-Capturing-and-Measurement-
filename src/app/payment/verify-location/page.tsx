@@ -32,8 +32,7 @@ const VerificationClientComponent = () => {
     setMessage('Verifying your payment...');
     
     try {
-      const locationPaymentService = new LocationPaymentService();
-      const response = await locationPaymentService.verifyLocationPayment(transactionId);
+      const response = await LocationPaymentService.verifyPayment({ transactionId });
       
       if (response.success) {
         setVerificationStatus('success');
@@ -46,7 +45,7 @@ const VerificationClientComponent = () => {
         }, 3000);
       } else {
         setVerificationStatus('failed');
-        setMessage(response.message || 'Payment verification failed. Please contact support.');
+        setMessage(response.data?.message || 'Payment verification failed. Please contact support.');
       }
     } catch (error: any) {
       setVerificationStatus('failed');

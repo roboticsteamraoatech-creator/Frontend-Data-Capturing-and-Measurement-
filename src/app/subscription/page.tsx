@@ -610,15 +610,14 @@ const SubscriptionPage: React.FC = () => {
       };
       
       // Initialize location payment
-      const locationPaymentService = new LocationPaymentService();
-      const response = await locationPaymentService.initializeLocationPayment(paymentData);
+      const response = await LocationPaymentService.initializePayment(paymentData);
       
       if (response.success && response.data) {
         setLocationPaymentData(response.data);
         // Redirect to payment gateway
         window.location.href = response.data.paymentLink;
       } else {
-        setLocationPaymentError(response.message || 'Failed to initialize location payment');
+        setLocationPaymentError('Failed to initialize location payment');
       }
     } catch (error: any) {
       console.error('Error initializing location payment:', error);
