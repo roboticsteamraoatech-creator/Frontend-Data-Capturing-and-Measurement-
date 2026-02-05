@@ -59,7 +59,7 @@ class PaymentService {
 
   async initializePayment(request: InitializePaymentRequest): Promise<InitializePaymentResponse> {
     try {
-      const url = '/api/payments/initialize'; // Using direct path since it's not in the routes file
+      const url = '/api/payment/initialize'; // Using direct path since it's not in the routes file
       const response = await this.httpService.postData<InitializePaymentResponse>(request, url);
       return response;
     } catch (error) {
@@ -70,7 +70,7 @@ class PaymentService {
 
   async verifyPayment(request: VerifyPaymentRequest): Promise<VerifyPaymentResponse> {
     try {
-      const url = '/api/payments/verify'; // Using direct path since it's not in the routes file
+      const url = '/api/payment/verify'; // Using direct path since it's not in the routes file
       const response = await this.httpService.postData<VerifyPaymentResponse>(request, url);
       return response;
     } catch (error) {

@@ -23,10 +23,13 @@ import {
 } from "lucide-react"
 import useSubscriptionPackages from '@/api/hooks/useSubscriptionPackages';
 import PaymentService from '@/services/PaymentService';
+import CombinedPaymentService from '@/services/CombinedPaymentService';
 import LocationPaymentService from '@/services/LocationPaymentService';
 import { useAuth } from '@/api/hooks/useAuth'; // Assuming we have an auth hook for user data
 import { useAuthContext, User } from '@/AuthContext';
 import OrganizationProfileService, { OrganizationProfile } from '@/services/OrganizationProfileService';
+import ProfileStep from './components/ProfileStep';
+import LocationStep from './components/LocationStep';
 
 interface APIService {
   _id: string;
@@ -57,6 +60,8 @@ interface APISubscriptionPackage {
 interface Service {
   id: string
   name: string
+  duration: string
+  price: number
   numberOfUsers: number
 }
 
@@ -67,12 +72,66 @@ interface SubscriptionPackage {
   monthlyPrice: number;
   quarterlyPrice: number;
   yearlyPrice: number;
+  originalMonthlyPrice: number;
+  originalQuarterlyPrice: number;
+  originalYearlyPrice: number;
+  hasApiDiscount?: boolean;
   features: string[];
   services: Service[];
   maxUsers?: number;
   finalPriceAfterDiscount?: number;
   totalServiceCost?: number;
+  promoCode?: string;
+  discountPercentage?: number;
+  discountAmount?: number;
+  hasActivePromo?: boolean;
 }
+
+// Define types for location data
+type LocationData = {
+  locationType: 'headquarters' | 'branch';
+  brandName: string;
+  country: string;
+  state: string;
+  lga: string;
+  city: string;
+  cityRegion: string;
+  cityRegionFee?: number;
+  pricingSource?: string; // New field to track pricing source
+  houseNumber: string;
+  street: string;
+  landmark?: string;
+  buildingColor?: string;
+  buildingType?: string;
+  gallery: {
+    images: (string | File)[];
+    videos: (string | File)[];
+  };
+};
+  
+type DropdownState = {
+  countryDropdownOpen: boolean;
+  stateDropdownOpen: boolean;
+  lgaDropdownOpen: boolean;
+  cityDropdownOpen: boolean;
+  cityRegionDropdownOpen: boolean;
+  // Search states
+  countrySearch: string;
+  stateSearch: string;
+  lgaSearch: string;
+  citySearch: string;
+  cityRegionSearch: string;
+  // Loading states
+  loadingStates: boolean;
+  loadingLgas: boolean;
+  loadingCities: boolean;
+  loadingCityRegions: boolean;
+  // Filtered options
+  statesForCountry: (string | { name: string; isoCode?: string })[];
+  lgasForState: (string | { name: string })[];
+  citiesForLga: (string | { name: string })[];
+  cityRegionsForCity: { name: string; fee: number; _id: string }[];
+};
 
 
 const SubscriptionPage: React.FC = () => {
@@ -95,6 +154,7 @@ const SubscriptionPage: React.FC = () => {
     isPublicProfile: false,
     verificationStatus: 'unverified',
   });
+  
   const [orgProfileSubmitting, setOrgProfileSubmitting] = useState(false);
   const [orgProfileSuccess, setOrgProfileSuccess] = useState(false);
   const [orgProfileError, setOrgProfileError] = useState<string | null>(null);
@@ -193,7 +253,7 @@ const SubscriptionPage: React.FC = () => {
     }
   };
   
-  // Helper function to get filtered countries
+  // Helper functions for filtering
   const getFilteredCountries = (searchTerm: string = '') => {
     if (!countries) return [];
     return countries.filter(country =>
@@ -201,53 +261,7 @@ const SubscriptionPage: React.FC = () => {
       (country.isoCode && country.isoCode.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   };
-  
-  // Define types for location data
-  type LocationData = {
-    locationType: 'headquarters' | 'branch';
-    brandName: string;
-    country: string;
-    state: string;
-    lga: string;
-    city: string;
-    cityRegion: string;
-    cityRegionFee?: number;
-    houseNumber: string;
-    street: string;
-    landmark?: string;
-    buildingColor?: string;
-    buildingType?: string;
-    gallery: {
-      images: (string | File)[];
-      videos: (string | File)[];
-    };
-  };
-  
-  type DropdownState = {
-    countryDropdownOpen: boolean;
-    stateDropdownOpen: boolean;
-    lgaDropdownOpen: boolean;
-    cityDropdownOpen: boolean;
-    cityRegionDropdownOpen: boolean;
-    // Search states
-    countrySearch: string;
-    stateSearch: string;
-    lgaSearch: string;
-    citySearch: string;
-    cityRegionSearch: string;
-    // Loading states
-    loadingStates: boolean;
-    loadingLgas: boolean;
-    loadingCities: boolean;
-    loadingCityRegions: boolean;
-    // Filtered options
-    statesForCountry: (string | { name: string; isoCode?: string })[];
-    lgasForState: (string | { name: string })[];
-    citiesForLga: (string | { name: string })[];
-    cityRegionsForCity: { name: string; fee: number; _id: string }[];
-  };
-  
-  // Helper function to get filtered states for a location
+
   const getFilteredStatesForLocation = (index: number, searchTerm: string = ''): (string | { name: string; isoCode?: string })[] => {
     const states = locationDropdownStates[index]?.statesForCountry || [];
     return states.filter((state) =>
@@ -256,8 +270,7 @@ const SubscriptionPage: React.FC = () => {
       (typeof state === 'object' && state.isoCode && state.isoCode.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   };
-  
-  // Helper function to get filtered lgas for a location
+
   const getFilteredLgasForLocation = (index: number, searchTerm: string = ''): (string | { name: string })[] => {
     const lgas = locationDropdownStates[index]?.lgasForState || [];
     return lgas.filter((lga) =>
@@ -265,8 +278,7 @@ const SubscriptionPage: React.FC = () => {
       (typeof lga === 'object' && lga.name && lga.name.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   };
-  
-  // Helper function to get filtered cities for a location
+
   const getFilteredCitiesForLocation = (index: number, searchTerm: string = ''): (string | { name: string })[] => {
     const cities = locationDropdownStates[index]?.citiesForLga || [];
     return cities.filter((city) =>
@@ -274,16 +286,15 @@ const SubscriptionPage: React.FC = () => {
       (typeof city === 'object' && city.name && city.name.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   };
-  
-  // Helper function to get filtered city regions for a location
+
   const getFilteredCityRegionsForLocation = (index: number, searchTerm: string = ''): { name: string; fee: number; _id: string }[] => {
     const regions = locationDropdownStates[index]?.cityRegionsForCity || [];
     return regions.filter((region) =>
       (region.name && region.name.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   };
-  
-  // Function to load states for a location
+
+  // Functions to load location data
   const loadStatesForLocation = async (index: number, countryName: string) => {
     try {
       const HttpService = (await import('@/services/HttpService')).HttpService;
@@ -300,8 +311,7 @@ const SubscriptionPage: React.FC = () => {
       console.error('Error loading states:', error);
     }
   };
-  
-  // Function to load lgas for a location
+
   const loadLgasForLocation = async (index: number, countryName: string, stateName: string) => {
     try {
       const HttpService = (await import('@/services/HttpService')).HttpService;
@@ -318,8 +328,7 @@ const SubscriptionPage: React.FC = () => {
       console.error('Error loading LGAs:', error);
     }
   };
-  
-  // Function to load cities for a location
+
   const loadCitiesForLocation = async (index: number, countryName: string, stateName: string, lgaName: string) => {
     try {
       const HttpService = (await import('@/services/HttpService')).HttpService;
@@ -336,8 +345,7 @@ const SubscriptionPage: React.FC = () => {
       console.error('Error loading cities:', error);
     }
   };
-  
-  // Function to load city regions for a location
+
   const loadCityRegionsForLocation = async (index: number, countryName: string, stateName: string, lgaName: string, cityName: string) => {
     try {
       const HttpService = (await import('@/services/HttpService')).HttpService;
@@ -358,59 +366,175 @@ const SubscriptionPage: React.FC = () => {
       console.error('Error loading city regions:', error);
     }
   };
+
+
+  
+
   
   // Refs for closing dropdowns on outside click
   const dropdownRefs = useRef<(HTMLDivElement | null)[]>([]);
 
+  // Helper function to validate and get user data
+  const getValidatedUserData = (context: string = 'payment') => {
+    const currentUser = authContext.user;
+    
+    console.log(`${context} - Current user data:`, currentUser);
+    
+    let paymentUserData = currentUser;
+    if (!currentUser || !currentUser.email || !currentUser.fullName || 
+        currentUser.email.trim() === '' || currentUser.fullName.trim() === '') {
+      console.log(`${context} - User data incomplete, checking localStorage...`);
+      // Try to get user data from localStorage as fallback
+      if (typeof window !== 'undefined') {
+        const storedUserStr = localStorage.getItem('user');
+        console.log(`${context} - Stored user string:`, storedUserStr);
+        if (storedUserStr) {
+          try {
+            const storedUser = JSON.parse(storedUserStr);
+            console.log(`${context} - Parsed stored user:`, storedUser);
+            if (storedUser && storedUser.email && storedUser.fullName && 
+                storedUser.email.trim() !== '' && storedUser.fullName.trim() !== '') {
+              paymentUserData = storedUser;
+              console.log(`${context} - Using stored user data:`, paymentUserData);
+            }
+          } catch (e) {
+            console.error(`${context} - Error parsing stored user data:`, e);
+          }
+        }
+      }
+    }
+    
+    // Final validation for required fields
+    if (!paymentUserData || 
+        !paymentUserData.email || 
+        !paymentUserData.fullName || 
+        paymentUserData.email.trim() === '' || 
+        paymentUserData.fullName.trim() === '') {
+      
+      console.error(`${context} - Required user fields missing after all attempts:`, {
+        currentUser: currentUser,
+        paymentUserData: paymentUserData,
+        currentUserEmail: currentUser?.email,
+        currentUserFullName: currentUser?.fullName,
+        paymentUserEmail: paymentUserData?.email,
+        paymentUserFullName: paymentUserData?.fullName
+      });
+      
+      return {
+        isValid: false,
+        error: `User profile is incomplete. Email and full name are required to process ${context}. Please update your profile with valid email and full name.`,
+        userData: null
+      };
+    }
+    
+    // Ensure we have clean data
+    const cleanPaymentData = {
+      email: paymentUserData.email.trim(),
+      fullName: paymentUserData.fullName.trim(),
+      phoneNumber: paymentUserData.phoneNumber || '',
+      id: paymentUserData.id || ''
+    };
+    
+    console.log(`${context} - Clean payment user data:`, cleanPaymentData);
+    
+    return {
+      isValid: true,
+      error: null,
+      userData: cleanPaymentData
+    };
+  };
 
+  // State for promo codes
+  const [appliedPromoCodes, setAppliedPromoCodes] = useState<Record<string, {code: string, discount: number}>>({});
+  const [promoCodeInputs, setPromoCodeInputs] = useState<Record<string, string>>({});
+  
   const packages: SubscriptionPackage[] = apiPackages?.map(pkg => {
-   
-    const monthlyPrice = pkg.finalPriceAfterDiscount !== undefined && pkg.finalPriceAfterDiscount !== 0 ? 
-      pkg.finalPriceAfterDiscount : pkg.totalServiceCost || 0;
-    const quarterlyPrice = pkg.finalPriceAfterDiscount !== undefined && pkg.finalPriceAfterDiscount !== 0 ? 
-      pkg.finalPriceAfterDiscount : pkg.totalServiceCost || 0;
-    const yearlyPrice = pkg.finalPriceAfterDiscount !== undefined && pkg.finalPriceAfterDiscount !== 0 ? 
-      pkg.finalPriceAfterDiscount : pkg.totalServiceCost || 0;
+    // For your example: monthly services cost ₦3,000 with 20% discount = ₦2,400
+    
+    // Calculate original prices from services (these go in the dropdown)
+    const servicesByDuration = {
+      monthly: pkg.services?.filter(s => s.duration === 'monthly') || [],
+      quarterly: pkg.services?.filter(s => s.duration === 'quarterly') || [],
+      yearly: pkg.services?.filter(s => s.duration === 'yearly') || []
+    };
+    
+    const originalMonthlyPrice = servicesByDuration.monthly.reduce((sum, service) => sum + (service.price || 0), 0);
+    const originalQuarterlyPrice = servicesByDuration.quarterly.reduce((sum, service) => sum + (service.price || 0), 0);
+    const originalYearlyPrice = servicesByDuration.yearly.reduce((sum, service) => sum + (service.price || 0), 0);
+    
+    // Check if API has applied discount
+    const hasApiDiscount = pkg.finalPriceAfterDiscount !== undefined && 
+                          pkg.finalPriceAfterDiscount !== pkg.totalServiceCost && 
+                          pkg.finalPriceAfterDiscount !== originalMonthlyPrice;
+    
+    // Check for user-applied promo codes
+    const appliedPromo = appliedPromoCodes[pkg._id];
+    const hasUserPromo = appliedPromo && pkg.promoCode && pkg.promoCode.toLowerCase() === appliedPromo.code.toLowerCase();
     
     return {
       id: pkg._id,
       packageName: pkg.title,
       description: pkg.description,
-      monthlyPrice,
-      quarterlyPrice,
-      yearlyPrice,
+      // Dropdown shows ORIGINAL prices (before discount)
+      monthlyPrice: originalMonthlyPrice,
+      quarterlyPrice: originalQuarterlyPrice,
+      yearlyPrice: originalYearlyPrice,
+      // Store original prices for reference
+      originalMonthlyPrice: originalMonthlyPrice,
+      originalQuarterlyPrice: originalQuarterlyPrice,
+      originalYearlyPrice: originalYearlyPrice,
+      hasApiDiscount: hasApiDiscount,
+      hasUserPromo: hasUserPromo,
       features: pkg.features || [],
       services: pkg.services?.map(service => ({
         id: service._id || service.serviceId,
         name: service.serviceName,
+        duration: service.duration,
+        price: service.price,
         numberOfUsers: 1 // Default to 1, can be adjusted by user
       })) || [],
       maxUsers: pkg.maxUsers,
       finalPriceAfterDiscount: pkg.finalPriceAfterDiscount,
-      totalServiceCost: pkg.totalServiceCost
+      totalServiceCost: pkg.totalServiceCost,
+      promoCode: pkg.promoCode,
+      discountPercentage: pkg.discountPercentage,
+      discountAmount: pkg.discountAmount,
+      hasActivePromo: Boolean(hasUserPromo)
     };
   }) || [];
 
   useEffect(() => {
-    let total = 0
+    let packageTotal = 0;
     Object.entries(selectedPackages).forEach(([packageId, billingCycle]) => {
       const pkg = packages.find((p) => p.id === packageId)
       if (pkg) {
-        switch (billingCycle) {
-          case "monthly":
-            total += pkg.monthlyPrice
-            break
-          case "quarterly":
-            total += pkg.quarterlyPrice
-            break
-          case "yearly":
-            total += pkg.yearlyPrice
-            break
-        }
+        // CRITICAL: Calculate based on services for the selected duration
+        const servicesForDuration = pkg.services.filter(service => service.duration === billingCycle);
+        const durationAmount = servicesForDuration.reduce((sum, service) => sum + (service.price || 0), 0);
+        packageTotal += durationAmount;
+        
+        console.log(`💰 Package ${pkg.packageName} (${billingCycle}): ₦${durationAmount.toLocaleString()}`);
       }
-    })
-    setTotalAmount(total)
-  }, [selectedPackages, packages])
+    });
+
+    // Add location fees if public profile and locations exist
+    let locationTotal = 0;
+    if (organizationProfile.isPublicProfile && locations.length > 0) {
+      locationTotal = locations.reduce((total, location) => {
+        return total + (location.cityRegionFee || 0);
+      }, 0);
+    }
+
+    const combinedTotal = packageTotal + locationTotal;
+    setTotalAmount(combinedTotal);
+    
+    console.log('💰 Total calculation:', {
+      packageTotal,
+      locationTotal,
+      combinedTotal,
+      hasLocations: organizationProfile.isPublicProfile && locations.length > 0
+    });
+  }, [selectedPackages, packages, organizationProfile.isPublicProfile, locations])
 
   const handlePackageSelection = (packageId: string, billingCycle: "monthly" | "quarterly" | "yearly") => {
     setSelectedPackages((prev) => {
@@ -424,7 +548,6 @@ const SubscriptionPage: React.FC = () => {
   }
 
   const handlePayment = async () => {
-   
     setPaymentInitializationError(null);
     
     if (Object.keys(selectedPackages).length === 0) {
@@ -432,114 +555,158 @@ const SubscriptionPage: React.FC = () => {
       return;
     }
 
-    
     const [firstPackageId, subscriptionDuration] = Object.entries(selectedPackages)[0];
-    
-    
     const currentUser = authContext.user;
+    
     if (!authContext.token) {
       alert("User not authenticated. Please log in.");
-      
       window.location.reload();
       return;
     }
-    
-    
-    let paymentUserData = currentUser;
-    if (!currentUser || !currentUser.email || !currentUser.fullName) {
-      
-      if (typeof window !== 'undefined') {
-        const storedUserStr = localStorage.getItem('user');
-        if (storedUserStr) {
-          try {
-            const storedUser = JSON.parse(storedUserStr);
-            if (storedUser && storedUser.email && storedUser.fullName) {
-              paymentUserData = storedUser;
-            }
-          } catch (e) {
-            console.error('Error parsing stored user data:', e);
-          }
-        }
-      }
-    }
-    
- 
-    if (!paymentUserData || !paymentUserData.email || !paymentUserData.fullName) {
-      console.error('Required user fields missing after all attempts:', {
-        currentUser: currentUser,
-        paymentUserData: paymentUserData
-      });
-      alert("User profile is incomplete. Please ensure your profile has email and name.");
+
+    // Use the helper function for validation
+    const validationResult = getValidatedUserData('package payment');
+    if (!validationResult.isValid || !validationResult.userData) {
+      setPaymentInitializationError(validationResult.error || 'User profile validation failed');
+      setIsProcessingPayment(false);
       return;
     }
 
+    const cleanPaymentData = validationResult.userData;
     setIsProcessingPayment(true);
-    
+        
     try {
-     
       const selectedPackage = packages.find(p => p.id === firstPackageId);
-      
-      
       const numberOfUsers = packageUserCounts[firstPackageId] || selectedPackage?.maxUsers || 1;
-      
-      
+          
       if (selectedPackage?.maxUsers && numberOfUsers > selectedPackage.maxUsers) {
         setUserLimitError(`Number of users (${numberOfUsers}) exceeds the maximum allowed (${selectedPackage.maxUsers}) for this package.`);
         setIsProcessingPayment(false);
         return;
       }
-      
+
       // Clear any previous user limit error
       setUserLimitError(null);
+          
+      // CRITICAL: Get the correct amount for the selected billing cycle
+      // Filter services by the selected duration and sum their prices
+      const servicesForDuration = selectedPackage?.services?.filter(service => service.duration === subscriptionDuration) || [];
+      const packageAmount = servicesForDuration.reduce((sum, service) => sum + (service.price || 0), 0);
       
-      // Determine the amount to charge based on discount availability
-      const baseAmount = getBillingPrice(selectedPackage!, subscriptionDuration);
-      let amountToCharge = baseAmount;
-      
-      // Check if the package has a discount
-      if (selectedPackage?.finalPriceAfterDiscount !== undefined && 
-          selectedPackage?.finalPriceAfterDiscount > 0 && 
-          selectedPackage?.finalPriceAfterDiscount < baseAmount) {
-        // Use discounted price if available and it's less than the base amount
-        amountToCharge = selectedPackage.finalPriceAfterDiscount;
-      } else if (selectedPackage?.totalServiceCost !== undefined && selectedPackage?.totalServiceCost > 0) {
-        // Fallback to total service cost if no discount is applied
-        amountToCharge = selectedPackage.totalServiceCost;
-      }
-      
-      const paymentRequest = {
-        userId: paymentUserData?.id as string, 
-        userType: 'organization' as const, 
-        packageId: firstPackageId,
-        subscriptionDuration,
-        amount: amountToCharge, 
-        maxUsers: numberOfUsers, 
-        email: paymentUserData?.email || '',
-        name: paymentUserData?.fullName || '',
-        phone: paymentUserData?.phoneNumber || '',
-        returnUrl: `${window.location.origin}/payment/verify?status=success`,
-        cancelUrl: `${window.location.origin}/payment/verify?status=cancelled`
-      };
-      
+      console.log(`💰 Package amount for ${subscriptionDuration}:`, packageAmount);
+      console.log(`💰 Services for ${subscriptionDuration}:`, servicesForDuration);
+      console.log(`💰 NOT using finalPriceAfterDiscount (${selectedPackage?.finalPriceAfterDiscount}) - using duration-specific amount`);
 
-      
-   
-      const response = await PaymentService.initializePayment(paymentRequest);
-      
-      if (response.success) {
-              
-        setPaymentInitializationError(null);
-              
-        // Redirect to payment gateway
-        window.location.href = response.data.paymentLink;
+      const appliedPromo = appliedPromoCodes[firstPackageId];
+
+      // Check if we have locations for combined payment
+      const hasLocations = organizationProfile.isPublicProfile && locations.length > 0 && 
+                          locations.some(loc => loc.country && loc.state && loc.city);
+
+      if (hasLocations) {
+        // Use Combined Payment Service
+        console.log('🔄 Using combined payment for package + locations');
+        
+        const combinedPaymentService = new CombinedPaymentService();
+        
+        // Prepare locations data for combined payment
+        const locationsForPayment = locations
+          .filter(loc => loc.country && loc.state && loc.city)
+          .map(loc => ({
+            country: loc.country,
+            state: loc.state,
+            lga: loc.lga || undefined,
+            city: loc.city,
+            cityRegion: loc.cityRegion || undefined,
+            brandName: loc.brandName,
+            locationType: loc.locationType,
+            houseNumber: loc.houseNumber,
+            street: loc.street,
+            landmark: loc.landmark,
+            buildingColor: loc.buildingColor,
+            buildingType: loc.buildingType,
+          }));
+
+        const combinedPaymentRequest = {
+          // Package details
+          packageId: firstPackageId,
+          subscriptionDuration,
+          packageAmount,
+          maxUsers: numberOfUsers,
+          
+          // Location details
+          locations: locationsForPayment,
+          
+          // User details
+          userId: cleanPaymentData.id as string,
+          userType: 'organization' as const,
+          email: cleanPaymentData.email,
+          name: cleanPaymentData.fullName,
+          phone: cleanPaymentData.phoneNumber,
+          
+          // Payment details
+          returnUrl: `${window.location.origin}/payment/verify?status=success&type=combined`,
+          cancelUrl: `${window.location.origin}/payment/verify?status=cancelled&type=combined`,
+          
+          // Optional promo code
+          ...(appliedPromo && {
+            promoCode: appliedPromo.code,
+            discountPercentage: appliedPromo.discount
+          })
+        };
+
+        console.log('🚀 Combined payment request:', combinedPaymentRequest);
+
+        const response = await combinedPaymentService.initializeCombinedPayment(combinedPaymentRequest);
+        
+        if (response.success && response.data) {
+          setPaymentInitializationError(null);
+          console.log('✅ Combined payment initialized successfully');
+          console.log('💰 Total amount:', response.data.totalAmount);
+          console.log('📦 Package amount:', response.data.packageAmount);
+          console.log('📍 Location amount:', response.data.locationAmount);
+          
+          // Redirect to payment gateway
+          window.location.href = response.data.paymentLink;
+        } else {
+          setPaymentInitializationError(response.error || 'Combined payment initialization failed');
+          setIsProcessingPayment(false);
+        }
       } else {
-              
-        setPaymentInitializationError(response.message || 'Payment initialization failed');
-        setIsProcessingPayment(false);
+        // Use Regular Package Payment Service (existing logic)
+        console.log('🔄 Using regular package payment (no locations)');
+        
+        const paymentRequest = {
+          userId: cleanPaymentData.id as string, 
+          userType: 'organization' as const, 
+          packageId: firstPackageId,
+          subscriptionDuration,
+          amount: packageAmount, 
+          maxUsers: numberOfUsers, 
+          email: cleanPaymentData.email,
+          name: cleanPaymentData.fullName,
+          phone: cleanPaymentData.phoneNumber,
+          returnUrl: `${window.location.origin}/payment/verify?status=success&type=package`,
+          cancelUrl: `${window.location.origin}/payment/verify?status=cancelled&type=package`,
+          ...(appliedPromo && {
+            promoCode: appliedPromo.code,
+            discountPercentage: appliedPromo.discount
+          })
+        };
+        
+        console.log('🚀 Package payment request:', paymentRequest);
+        const response = await PaymentService.initializePayment(paymentRequest);
+        
+        if (response.success) {
+          setPaymentInitializationError(null);
+          window.location.href = response.data.paymentLink;
+        } else {
+          setPaymentInitializationError('Payment initialization failed');
+          setIsProcessingPayment(false);
+        }
       }
     } catch (error: any) {
-      console.error('Error initializing payment:', error);
-        
+      console.error('❌ Error initializing payment:', error);
       setPaymentInitializationError(error.message || 'An error occurred while initializing payment. Please try again.');
     } finally {
       setIsProcessingPayment(false);
@@ -559,6 +726,48 @@ const SubscriptionPage: React.FC = () => {
     }
   }
 
+  const handleLocationPayment = async () => {
+    setLocationPaymentInitializing(true);
+    setLocationPaymentError(null);
+    
+    try {
+      // Use the helper function for validation
+      const validationResult = getValidatedUserData('location payment');
+      if (!validationResult.isValid || !validationResult.userData) {
+        setLocationPaymentError(validationResult.error || 'User profile validation failed');
+        setLocationPaymentInitializing(false);
+        return;
+      }
+      
+      const cleanPaymentData = validationResult.userData;
+      
+      // Prepare payment data
+      const paymentData = {
+        email: cleanPaymentData.email,
+        name: cleanPaymentData.fullName,
+        phone: cleanPaymentData.phoneNumber
+      };
+      
+      console.log('Location payment - Payment data being sent:', paymentData);
+      
+      // Initialize location payment
+      const response = await LocationPaymentService.initializePayment(paymentData);
+      
+      if (response.success && response.data) {
+        setLocationPaymentData(response.data);
+        // Redirect to payment gateway
+        window.location.href = response.data.paymentLink;
+      } else {
+        setLocationPaymentError('Failed to initialize location payment');
+      }
+    } catch (error: any) {
+      console.error('Error initializing location payment:', error);
+      setLocationPaymentError(error.message || 'An error occurred while initializing location payment');
+    } finally {
+      setLocationPaymentInitializing(false);
+    }
+  };
+  
   const handleOrgProfileSubmit = async () => {
     setOrgProfileSubmitting(true);
     setOrgProfileError(null);
@@ -580,7 +789,7 @@ const SubscriptionPage: React.FC = () => {
           }
         }, 1500);
       } else {
-        setOrgProfileError(response.message || 'Failed to save organization profile');
+        setOrgProfileError('Failed to save organization profile');
       }
     } catch (error: any) {
       console.error('Error saving organization profile:', error);
@@ -590,42 +799,7 @@ const SubscriptionPage: React.FC = () => {
     }
   };
 
-  const handleLocationPayment = async () => {
-    setLocationPaymentInitializing(true);
-    setLocationPaymentError(null);
-    
-    try {
-      const currentUser = authContext.user;
-      if (!authContext.token || !currentUser) {
-        setLocationPaymentError("User not authenticated. Please log in.");
-        setLocationPaymentInitializing(false);
-        return;
-      }
-      
-      // Prepare payment data
-      const paymentData = {
-        email: currentUser.email || '',
-        name: currentUser.fullName || '',
-        phone: currentUser.phoneNumber || ''
-      };
-      
-      // Initialize location payment
-      const response = await LocationPaymentService.initializePayment(paymentData);
-      
-      if (response.success && response.data) {
-        setLocationPaymentData(response.data);
-        // Redirect to payment gateway
-        window.location.href = response.data.paymentLink;
-      } else {
-        setLocationPaymentError('Failed to initialize location payment');
-      }
-    } catch (error: any) {
-      console.error('Error initializing location payment:', error);
-      setLocationPaymentError(error.message || 'An error occurred while initializing location payment');
-    } finally {
-      setLocationPaymentInitializing(false);
-    }
-  };
+
 
   if (loading) {
     return (
@@ -724,7 +898,7 @@ const SubscriptionPage: React.FC = () => {
           </div>
         </div>
 
-        {currentStep === 'packages' && (
+        {/* {currentStep === 'packages' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
             {packages.map((pkg) => (
               <div
@@ -737,23 +911,82 @@ const SubscriptionPage: React.FC = () => {
               >
                 <div className="flex justify-between items-start mb-4">
                   <h3 className="text-xl font-bold text-gray-900">{pkg.packageName}</h3>
-                  <select
-                    value={selectedPackages[pkg.id] || ""}
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        handlePackageSelection(pkg.id, e.target.value as "monthly" | "quarterly" | "yearly")
-                      }
-                    }}
-                    className="px-3 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
-                  >
-                    <option value="">Select Plan</option>
-                    <option value="monthly">Monthly - ₦{Math.round(pkg.monthlyPrice).toLocaleString('en-NG')}</option>
-                    <option value="quarterly">Quarterly - ₦{Math.round(pkg.quarterlyPrice).toLocaleString('en-NG')}</option>
-                    <option value="yearly">Yearly - ₦{Math.round(pkg.yearlyPrice).toLocaleString('en-NG')}</option>
-                  </select>
+                  <div className="flex flex-col gap-2">
+                    <div className="space-y-3">
+                      <div>
+                       
+                        <select
+                          value={selectedPackages[pkg.id] || ""}
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              handlePackageSelection(pkg.id, e.target.value as "monthly" | "quarterly" | "yearly")
+                            }
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        >
+                          <option value="">Select Plan</option>
+                          <option value="monthly">Monthly - ₦{Math.round(pkg.monthlyPrice).toLocaleString('en-NG')}</option>
+                          <option value="quarterly">Quarterly - ₦{Math.round(pkg.quarterlyPrice).toLocaleString('en-NG')}</option>
+                          <option value="yearly">Yearly - ₦{Math.round(pkg.yearlyPrice).toLocaleString('en-NG')}</option>
+                        </select>
+                      </div>
+                      
+
+                      {pkg.hasApiDiscount && (
+                        <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                            🎉 {pkg.discountPercentage || 20}% DISCOUNT
+                          </span>
+                          
+                        </div>
+                      )}
+                      
+
+                    </div>
+                    
+                   
+                    {pkg.promoCode && (
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={promoCodeInputs[pkg.id] || ''}
+                          onChange={(e) => setPromoCodeInputs(prev => ({
+                            ...prev,
+                            [pkg.id]: e.target.value
+                          }))}
+                          placeholder="Enter promo code"
+                          className="px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 focus:border-transparent"
+                        />
+                        <button
+                          onClick={() => {
+                            const enteredCode = promoCodeInputs[pkg.id]?.trim();
+                            if (enteredCode && pkg.promoCode && enteredCode.toLowerCase() === pkg.promoCode.toLowerCase()) {
+                              setAppliedPromoCodes(prev => ({
+                                ...prev,
+                                [pkg.id]: {
+                                  code: enteredCode,
+                                  discount: pkg.discountPercentage || 0
+                                }
+                              }));
+                            } else {
+                              
+                              const newApplied = {...appliedPromoCodes};
+                              delete newApplied[pkg.id];
+                              setAppliedPromoCodes(newApplied);
+                            }
+                          }}
+                          className={`px-2 py-1 text-xs rounded ${appliedPromoCodes[pkg.id] ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                        >
+                          {appliedPromoCodes[pkg.id] ? 'Applied ✓' : 'Apply'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <p className="text-gray-700 mb-6 text-sm">{pkg.description}</p>
+                
+            
 
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Number of Users</label>
@@ -776,11 +1009,11 @@ const SubscriptionPage: React.FC = () => {
                         [pkg.id]: value
                       }));
                       
-                      // Real-time validation
+                     
                       if (pkg.maxUsers && value > pkg.maxUsers) {
                         setUserLimitError(`Number of users (${value}) exceeds the maximum allowed (${pkg.maxUsers}) for this package.`);
                       } else {
-                        // Clear error if it was for this package
+                       
                         if (userLimitError && selectedPackages[pkg.id]) {
                           setUserLimitError(null);
                         }
@@ -833,9 +1066,194 @@ const SubscriptionPage: React.FC = () => {
               </div>
             ))}
           </div>
-        )}
+        )} */}
 
-    
+   
+
+{currentStep === 'packages' && (
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+    {packages.map((pkg) => (
+      <div
+        key={pkg.id}
+        className={`relative flex flex-col rounded-xl border-2 p-6 transition-all duration-200 min-h-[650px] ${
+          selectedPackages[pkg.id]
+            ? "border-purple-500 bg-purple-50 shadow-lg"
+            : "border-gray-200 bg-white hover:shadow-md"
+        }`}
+      >
+        
+        <div className="mb-4">
+          <div className="flex justify-between items-start mb-3">
+            <h3 className="text-xl font-bold text-gray-900 line-clamp-1">{pkg.packageName}</h3>
+            {pkg.hasApiDiscount && (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 whitespace-nowrap">
+                🎉 {pkg.discountPercentage || 20}% OFF
+              </span>
+            )}
+          </div>
+          
+      
+          <p className="text-gray-600 mb-4 text-sm line-clamp-2 min-h-[2.5rem]">
+            {pkg.description}
+          </p>
+        </div>
+
+        
+        <div className="mb-4 space-y-2">
+          <select
+            value={selectedPackages[pkg.id] || ""}
+            onChange={(e) => {
+              if (e.target.value) {
+                handlePackageSelection(pkg.id, e.target.value as "monthly" | "quarterly" | "yearly")
+              }
+            }}
+            className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          >
+            <option value="">Select Plan</option>
+            <option value="monthly">Monthly - ₦{Math.round(pkg.monthlyPrice).toLocaleString('en-NG')}</option>
+            <option value="quarterly">Quarterly - ₦{Math.round(pkg.quarterlyPrice).toLocaleString('en-NG')}</option>
+            <option value="yearly">Yearly - ₦{Math.round(pkg.yearlyPrice).toLocaleString('en-NG')}</option>
+          </select>
+
+          
+          {pkg.promoCode && (
+            <div className="flex gap-2 items-center">
+              <input
+                type="text"
+                value={promoCodeInputs[pkg.id] || ''}
+                onChange={(e) => setPromoCodeInputs(prev => ({
+                  ...prev,
+                  [pkg.id]: e.target.value
+                }))}
+                placeholder="Enter promo code"
+                className="flex-1 px-3 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 focus:border-transparent"
+              />
+              <button
+                onClick={() => {
+                  const enteredCode = promoCodeInputs[pkg.id]?.trim();
+                  if (enteredCode && pkg.promoCode && enteredCode.toLowerCase() === pkg.promoCode.toLowerCase()) {
+                    setAppliedPromoCodes(prev => ({
+                      ...prev,
+                      [pkg.id]: {
+                        code: enteredCode,
+                        discount: pkg.discountPercentage || 0
+                      }
+                    }));
+                  } else {
+                    const newApplied = {...appliedPromoCodes};
+                    delete newApplied[pkg.id];
+                    setAppliedPromoCodes(newApplied);
+                  }
+                }}
+                className={`px-3 py-1.5 text-xs rounded whitespace-nowrap ${
+                  appliedPromoCodes[pkg.id] 
+                    ? 'bg-green-100 text-green-800 border border-green-200' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
+                }`}
+              >
+                {appliedPromoCodes[pkg.id] ? 'Applied ✓' : 'Apply'}
+              </button>
+            </div>
+          )}
+        </div>
+
+       
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Number of Users
+          </label>
+          <input
+            name={`numberOfUsers-${pkg.id}`}
+            type="number"
+            min="1"
+            max={pkg.maxUsers || 10}
+            defaultValue={pkg.maxUsers || 1}
+            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm ${
+              packageUserCounts[pkg.id] && pkg.maxUsers && packageUserCounts[pkg.id] > pkg.maxUsers 
+                ? 'border-red-500' 
+                : 'border-gray-300'
+            }`}
+            placeholder={`Enter number of users (up to ${pkg.maxUsers || 10})`}
+            onChange={(e) => {
+              const value = parseInt(e.target.value) || 1;
+              setPackageUserCounts(prev => ({
+                ...prev,
+                [pkg.id]: value
+              }));
+              
+              if (pkg.maxUsers && value > pkg.maxUsers) {
+                setUserLimitError(`Number of users (${value}) exceeds the maximum allowed (${pkg.maxUsers}) for this package.`);
+              } else if (userLimitError && selectedPackages[pkg.id]) {
+                setUserLimitError(null);
+              }
+            }}
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Maximum allowed: {pkg.maxUsers || 1} users
+          </p>
+        </div>
+
+      
+        <div className="mb-4">
+          <h4 className="font-semibold text-gray-900 mb-2 text-sm">Services:</h4>
+          <div className="space-y-1.5 max-h-[120px] overflow-y-auto">
+            {pkg.services.map((service, idx) => (
+              <div key={service.id} className="p-2 bg-gray-50 rounded border border-gray-100">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-700">{service.name}</span>
+                 
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex-1"></div>
+
+          <hr className="my-3 border-t-2 border-gray-300" />
+        <div className="mb-4">
+          <h4 className="font-semibold text-gray-900 mb-2 text-sm">Features:</h4>
+          <ul className="text-sm text-gray-700 space-y-1.5 max-h-[150px] overflow-y-auto">
+            {pkg.features.map((feature, idx) => (
+              <li key={idx} className="flex items-start">
+                <CheckCircle className="w-4 h-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
+                <span className="line-clamp-2">{feature}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+      
+        <div className="mt-auto pt-4 border-t border-gray-200">
+          <div className="flex justify-between items-center">
+            <div className="text-sm">
+              {selectedPackages[pkg.id] ? (
+                <div>
+                  <span className="text-gray-600">Selected:</span>
+                  <span className="font-medium text-purple-600 ml-1 capitalize">
+                    {selectedPackages[pkg.id]} - ₦{Math.round(
+                      getBillingPrice(pkg, selectedPackages[pkg.id]!)
+                    ).toLocaleString('en-NG')}
+                  </span>
+                </div>
+              ) : (
+                <span className="text-gray-500">Not selected</span>
+              )}
+            </div>
+            {selectedPackages[pkg.id] && (
+              <button
+                onClick={() => handlePackageSelection(pkg.id, selectedPackages[pkg.id]!)}
+                className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-50"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    ))}
+  </div>
+)}
         {currentStep === 'packages' && Object.keys(selectedPackages).length > 0 && (
           <div className="mt-8 flex justify-end">
             <button
@@ -859,1109 +1277,101 @@ const SubscriptionPage: React.FC = () => {
 
         {/* Organization Profile Form - Step 2 */}
         {currentStep === 'profile' && (
-          <div className="mt-8 bg-white border border-gray-200 rounded-xl p-6 shadow-sm max-w-4xl mx-auto">
-            <h3 className="text-2xl font-semibold text-gray-900 mb-6">Organization Profile Setup</h3>
-            
-            {orgProfileSuccess ? (
-              <div className="mb-6 p-4 bg-green-100 text-green-800 rounded-lg">
-                <p className="font-medium">Organization profile saved successfully!</p>
-              </div>
-            ) : (
-              <>
-                {orgProfileError && (
-                  <div className="mb-6 p-4 bg-red-100 text-red-800 rounded-lg">
-                    <p className="font-medium">Error: {orgProfileError}</p>
-                  </div>
-                )}
-                
-                <div className="space-y-6">
-                  {/* Business Type Selection */}
-                  <div className="mb-6">
-                    <h4 className="text-lg font-medium text-gray-900 mb-4">Business Registration Status</h4>
-                    <div className="flex space-x-6">
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="businessType"
-                          checked={organizationProfile.businessType === 'registered'}
-                          onChange={() => setOrganizationProfile({...organizationProfile, businessType: 'registered'})}
-                          className="h-4 w-4 text-purple-600 focus:ring-purple-500"
-                        />
-                        <span className="ml-2 text-gray-700">Registered</span>
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="businessType"
-                          checked={organizationProfile.businessType === 'unregistered'}
-                          onChange={() => setOrganizationProfile({...organizationProfile, businessType: 'unregistered'})}
-                          className="h-4 w-4 text-purple-600 focus:ring-purple-500"
-                        />
-                        <span className="ml-2 text-gray-700">Unregistered</span>
-                      </label>
-                    </div>
-                  </div>
-                  
-                  {/* Public Profile Selection */}
-                  <div className="mb-6">
-                    <h4 className="text-lg font-medium text-gray-900 mb-4">Make Your Organization Profile Available to the Public?</h4>
-                    <div className="flex space-x-6">
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="isPublicProfile"
-                          checked={organizationProfile.isPublicProfile === true}
-                          onChange={() => setOrganizationProfile({...organizationProfile, isPublicProfile: true})}
-                          className="h-4 w-4 text-purple-600 focus:ring-purple-500"
-                        />
-                        <span className="ml-2 text-gray-700">Yes</span>
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="isPublicProfile"
-                          checked={organizationProfile.isPublicProfile === false}
-                          onChange={() => setOrganizationProfile({...organizationProfile, isPublicProfile: false})}
-                          className="h-4 w-4 text-purple-600 focus:ring-purple-500"
-                        />
-                        <span className="ml-2 text-gray-700">No</span>
-                      </label>
-                    </div>
-                    
-                    {/* Flow Information */}
-                    <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                      <div className="text-sm text-blue-800">
-                        {organizationProfile.isPublicProfile ? (
-                          <>
-                            <p className="font-medium mb-1">You will proceed to:</p>
-                            <p>1. Profile Setup → 2. Add Locations → 3. Payment</p>
-                            <p className="mt-2 text-xs">Public profiles require location information to be displayed.</p>
-                          </>
-                        ) : (
-                          <>
-                            <p className="font-medium mb-1">You will proceed to:</p>
-                            <p>1. Profile Setup → 2. Payment (Skip Locations)</p>
-                            <p className="mt-2 text-xs">Private profiles do not require location information.</p>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Verification Status Selection - Only shown if public profile is Yes */}
-                  {organizationProfile.isPublicProfile && (
-                    <div className="mb-6">
-                      <h4 className="text-lg font-medium text-gray-900 mb-4">Verification Status</h4>
-                      <div className="flex space-x-6">
-                        <label className="flex items-center">
-                          <input
-                            type="radio"
-                            name="verificationStatus"
-                            checked={organizationProfile.verificationStatus === 'verified'}
-                            onChange={() => setOrganizationProfile({...organizationProfile, verificationStatus: 'verified'})}
-                            className="h-4 w-4 text-purple-600 focus:ring-purple-500"
-                          />
-                          <span className="ml-2 text-gray-700">Verified</span>
-                        </label>
-                        <label className="flex items-center">
-                          <input
-                            type="radio"
-                            name="verificationStatus"
-                            checked={organizationProfile.verificationStatus === 'unverified'}
-                            onChange={() => setOrganizationProfile({...organizationProfile, verificationStatus: 'unverified'})}
-                            className="h-4 w-4 text-purple-600 focus:ring-purple-500"
-                          />
-                          <span className="ml-2 text-gray-700">Unverified</span>
-                        </label>
-                      </div>
-                      
-                      {/* Business Rules */}
-                      <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <h5 className="font-medium text-blue-900 mb-2">Business Rules:</h5>
-                        {organizationProfile.verificationStatus === 'verified' ? (
-                          <ul className="list-disc pl-5 text-sm text-blue-800 space-y-1">
-                            <li>Verified organizations can add more than one location</li>
-                            <li>Each location can add up to 10 items (products/services) with pictures and two videos under the gallery</li>
-                          </ul>
-                        ) : (
-                          <ul className="list-disc pl-5 text-sm text-blue-800 space-y-1">
-                            <li>Unverified organizations can only add one location (headquarters)</li>
-                            <li>The only allowed location can add 3 items (products)</li>
-                          </ul>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="mt-8 flex justify-between">
-                  <button
-                    onClick={() => setCurrentStep('packages')}
-                    className="px-6 py-3 rounded-lg font-semibold text-gray-700 bg-gray-200 hover:bg-gray-300"
-                  >
-                    Back to Packages
-                  </button>
-                  <button
-                    onClick={handleOrgProfileSubmit}
-                    disabled={orgProfileSubmitting}
-                    className={`px-6 py-3 rounded-lg font-semibold text-white ${orgProfileSubmitting ? 'bg-gray-400' : 'bg-purple-600 hover:bg-purple-700'}`}
-                  >
-                    {orgProfileSubmitting ? 'Saving...' : 
-                     organizationProfile.isPublicProfile ? 
-                       (organizationProfile.verificationStatus === 'verified' ? 'Continue to Locations & Verification' : 'Continue to Locations') 
-                       : 'Continue to Package Payment'
-                    }
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+          <ProfileStep
+            organizationProfile={organizationProfile as OrganizationProfile & { isPublicProfile: boolean }}
+            setOrganizationProfile={setOrganizationProfile}
+            currentStep={currentStep}
+            setCurrentStep={setCurrentStep}
+            orgProfileSubmitting={orgProfileSubmitting}
+            setOrgProfileSubmitting={setOrgProfileSubmitting}
+            orgProfileSuccess={orgProfileSuccess}
+            setOrgProfileSuccess={setOrgProfileSuccess}
+            orgProfileError={orgProfileError}
+            setOrgProfileError={setOrgProfileError}
+          />
         )}
 
-        {/* Location Payment Section - Step 4 (for verified organizations) */}
-        {currentStep === 'location-payment' && organizationProfile.verificationStatus === 'verified' && (
-          <div className="mt-8 bg-white border border-gray-200 rounded-xl p-6 shadow-sm max-w-4xl mx-auto">
-            <h3 className="text-2xl font-semibold text-gray-900 mb-6">Location Verification Payment</h3>
+        {/* Location Form - Step 3 */}
+        <LocationStep
+          locations={locations}
+          setLocations={setLocations}
+          locationDropdownStates={locationDropdownStates}
+          setLocationDropdownStates={setLocationDropdownStates}
+          currentStep={currentStep}
+          setCurrentStep={setCurrentStep}
+          organizationProfile={{
+            businessType: organizationProfile.businessType,
+            isPublicProfile: organizationProfile.isPublicProfile ?? false,
+            verificationStatus: organizationProfile.verificationStatus
+          }}
+          locationSubmitting={locationSubmitting}
+          setLocationSubmitting={setLocationSubmitting}
+          locationSuccess={locationSuccess}
+          setLocationSuccess={setLocationSuccess}
+          locationError={locationError}
+          setLocationError={setLocationError}
+          countries={countries}
+          locationPaymentInitializing={locationPaymentInitializing}
+          setLocationPaymentInitializing={setLocationPaymentInitializing}
+          locationPaymentError={locationPaymentError}
+          setLocationPaymentError={setLocationPaymentError}
+          locationPaymentData={locationPaymentData}
+          setLocationPaymentData={setLocationPaymentData}
+          handleLocationPayment={handleLocationPayment}
+          selectedPackageInfo={(() => {
+            const [firstPackageId, billingCycle] = Object.entries(selectedPackages)[0] || [];
+            if (!firstPackageId) return undefined;
             
-            {locationPaymentError && (
-              <div className="mb-6 p-4 bg-red-100 text-red-800 rounded-lg">
-                <p className="font-medium">Error: {locationPaymentError}</p>
-              </div>
-            )}
+            const selectedPackage = packages.find(p => p.id === firstPackageId);
+            if (!selectedPackage) return undefined;
             
-            <div className="space-y-6">
-              {/* Locations Summary */}
-              <div className="mb-6">
-                <h4 className="font-medium text-gray-900 mb-3">Locations to Verify</h4>
-                <div className="space-y-3">
-                  {locations.map((location, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div>
-                        <h5 className="font-medium text-gray-900">{location.brandName || `Location ${index + 1}`}</h5>
-                        <p className="text-sm text-gray-600">
-                          {location.city}, {location.state}, {location.country}
-                        </p>
-                        {location.cityRegion && (
-                          <p className="text-sm text-gray-600">
-                            Region: {location.cityRegion}
-                          </p>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        {location.cityRegionFee ? (
-                          <p className="font-semibold text-gray-900">₦{location.cityRegionFee.toLocaleString('en-NG')}</p>
-                        ) : (
-                          <p className="text-sm text-gray-500">Fee to be calculated</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Payment Information */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-medium text-blue-900 mb-2">Payment Information</h4>
-                <ul className="list-disc pl-5 text-sm text-blue-800 space-y-1">
-                  <li>Payment covers verification fees for all locations</li>
-                  <li>Fees are based on city regions and Super Admin pricing</li>
-                  <li>Successful payment grants verified badge status</li>
-                  <li>Allows up to 10 products/images and 2 videos per location</li>
-                </ul>
-              </div>
-              
-              {/* Action Buttons */}
-              <div className="mt-8 flex justify-between">
-                <button
-                  onClick={() => setCurrentStep('locations')}
-                  className="px-6 py-3 rounded-lg font-semibold text-gray-700 bg-gray-200 hover:bg-gray-300"
-                >
-                  Back to Locations
-                </button>
-                <button
-                  onClick={handleLocationPayment}
-                  disabled={locationPaymentInitializing}
-                  className={`px-6 py-3 rounded-lg font-semibold text-white flex items-center ${
-                    locationPaymentInitializing ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
-                  }`}
-                >
-                  {locationPaymentInitializing ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                      Initializing...
-                    </>
-                  ) : (
-                    <>
-                      <CreditCard className="w-5 h-5 mr-2" />
-                      Pay for Location Verification
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Locations Form - Step 3 */}
-        {currentStep === 'locations' && (
-          <div className="mt-8 bg-white border border-gray-200 rounded-xl p-6 shadow-sm max-w-4xl mx-auto">
-            <h3 className="text-2xl font-semibold text-gray-900 mb-6">Add Locations</h3>
             
-            {locationSuccess ? (
-              <div className="mb-6 p-4 bg-green-100 text-green-800 rounded-lg">
-                <p className="font-medium">Locations saved successfully!</p>
-              </div>
-            ) : (
-              <>
-                {locationError && (
-                  <div className="mb-6 p-4 bg-red-100 text-red-800 rounded-lg">
-                    <p className="font-medium">Error: {locationError}</p>
-                  </div>
-                )}
-                
-                <div className="space-y-6">
-                  {locations.map((location, index) => (
-                    <div key={index} className="border border-gray-200 rounded-lg p-6">
-                      <div className="flex justify-between items-center mb-4">
-                        <h4 className="text-lg font-medium text-gray-900">Location {index + 1}</h4>
-                        {locations.length > 1 && (
-                          <button
-                            onClick={() => {
-                              const newLocations = [...locations];
-                              newLocations.splice(index, 1);
-                              setLocations(newLocations);
-                              
-                              // Also remove the corresponding dropdown state
-                              const newDropdownStates = [...locationDropdownStates];
-                              newDropdownStates.splice(index, 1);
-                              setLocationDropdownStates(newDropdownStates);
-                            }}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Location Type</label>
-                          <select
-                            value={location.locationType}
-                            onChange={(e) => {
-                              const newLocations = [...locations];
-                              newLocations[index].locationType = e.target.value as 'headquarters' | 'branch';
-                              setLocations(newLocations);
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                          >
-                            <option value="headquarters">Headquarters</option>
-                            <option value="branch">Branch</option>
-                          </select>
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Brand Name</label>
-                          <input
-                            type="text"
-                            value={location.brandName}
-                            onChange={(e) => {
-                              const newLocations = [...locations];
-                              newLocations[index].brandName = e.target.value;
-                              setLocations(newLocations);
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                            placeholder="Enter brand name"
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        {/* Country Field - Searchable Dropdown */}
-                        <div className="relative">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Country <span className="text-red-500">*</span>
-                          </label>
-                          
-                          <div className="relative">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newDropdownStates = [...locationDropdownStates];
-                                newDropdownStates[index].countryDropdownOpen = !newDropdownStates[index].countryDropdownOpen;
-                                newDropdownStates[index].stateDropdownOpen = false;
-                                newDropdownStates[index].cityDropdownOpen = false;
-                                setLocationDropdownStates(newDropdownStates);
-                              }}
-                              className={`w-full flex items-center justify-between p-3 border rounded-lg hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 ${location.country ? '' : 'text-gray-500'}`}
-                            >
-                              <div className="flex items-center gap-3">
-                                <Globe className="w-5 h-5 text-gray-400" />
-                                {location.country ? (
-                                  <span>{location.country}</span>
-                                ) : (
-                                  <span className="text-gray-500">Select a country...</span>
-                                )}
-                              </div>
-                              <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${locationDropdownStates[index]?.countryDropdownOpen ? 'transform rotate-180' : ''}`} />
-                            </button>
-                            
-                            {locationDropdownStates[index]?.countryDropdownOpen && (
-                              <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-80 overflow-hidden">
-                                <div className="p-2 border-b">
-                                  <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                                    <input
-                                      type="text"
-                                      placeholder="Search countries..."
-                                      className="w-full pl-9 pr-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
-                                      value={locationDropdownStates[index]?.countrySearch || ''}
-                                      onChange={(e) => {
-                                        const newDropdownStates = [...locationDropdownStates];
-                                        newDropdownStates[index].countrySearch = e.target.value;
-                                        setLocationDropdownStates(newDropdownStates);
-                                      }}
-                                    />
-                                  </div>
-                                </div>
+            const servicesForDuration = selectedPackage?.services?.filter(service => service.duration === billingCycle) || [];
+            const packageAmount = servicesForDuration.reduce((sum, service) => sum + (service.price || 0), 0);
+            
+            console.log(`📦 Selected package amount for ${billingCycle}:`, packageAmount);
+            console.log(`📦 Services for ${billingCycle}:`, servicesForDuration);
+            
+            return {
+              packageName: selectedPackage.packageName,
+              billingCycle: billingCycle,
+              amount: packageAmount
+            };
+          })()}
+        />
 
-                                <div className="overflow-y-auto max-h-60">
-                                  {getFilteredCountries(locationDropdownStates[index]?.countrySearch).map((country) => (
-                                    <button
-                                      key={country.isoCode}
-                                      type="button"
-                                      onClick={() => {
-                                        const newLocations = [...locations];
-                                        newLocations[index].country = country.name;
-                                        setLocations(newLocations);
-                                        
-                                        // Close dropdown and clear search
-                                        const newDropdownStates = [...locationDropdownStates];
-                                        newDropdownStates[index].countryDropdownOpen = false;
-                                        newDropdownStates[index].countrySearch = '';
-                                        setLocationDropdownStates(newDropdownStates);
-                                      }}
-                                      className={`w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-50 ${
-                                        location.country === country.name ? 'bg-purple-500/10' : ''
-                                      }`}
-                                    >
-                                      <div className="text-left">
-                                        <div className="font-medium">{country.name}</div>
-                                      </div>
-                                      {location.country === country.name && (
-                                        <div className="ml-auto w-2 h-2 bg-purple-500 rounded-full"></div>
-                                      )}
-                                    </button>
-                                  ))}
-                                  
-                                  {getFilteredCountries(locationDropdownStates[index]?.countrySearch).length === 0 && (
-                                    <div className="px-3 py-2 text-gray-500 text-center">No countries found</div>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        
-                        {/* State Field - Searchable Dropdown */}
-                        <div className="relative">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            State/Province <span className="text-red-500">*</span>
-                          </label>
-                          
-                          {!location.country ? (
-                            <div className="p-4 bg-gray-50 rounded-lg text-gray-500 text-center">
-                              Please select a country first
-                            </div>
-                          ) : (
-                            <>
-                              <div className="relative">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    // Load states for this location if not already loaded
-                                    if (!locationDropdownStates[index]?.statesForCountry.length) {
-                                      loadStatesForLocation(index, location.country);
-                                    }
-                                    
-                                    const newDropdownStates = [...locationDropdownStates];
-                                    newDropdownStates[index].stateDropdownOpen = !newDropdownStates[index].stateDropdownOpen;
-                                    newDropdownStates[index].countryDropdownOpen = false;
-                                    newDropdownStates[index].cityDropdownOpen = false;
-                                    setLocationDropdownStates(newDropdownStates);
-                                  }}
-                                  className={`w-full flex items-center justify-between p-3 border rounded-lg hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 ${location.state ? '' : 'text-gray-500'}`}
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <MapPin className="w-5 h-5 text-gray-400" />
-                                    {location.state ? (
-                                      <span>{location.state}</span>
-                                    ) : (
-                                      <span className="text-gray-500">Select state...</span>
-                                    )}
-                                  </div>
-                                  <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${locationDropdownStates[index]?.stateDropdownOpen ? 'transform rotate-180' : ''}`} />
-                                </button>
-                                
-                                {locationDropdownStates[index]?.stateDropdownOpen && (
-                                  <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-80 overflow-hidden">
-                                    <div className="p-2 border-b">
-                                      <div className="relative">
-                                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                                        <input
-                                          type="text"
-                                          placeholder="Search states..."
-                                          className="w-full pl-9 pr-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
-                                          value={locationDropdownStates[index]?.stateSearch || ''}
-                                          onChange={(e) => {
-                                            const newDropdownStates = [...locationDropdownStates];
-                                            newDropdownStates[index].stateSearch = e.target.value;
-                                            setLocationDropdownStates(newDropdownStates);
-                                          }}
-                                        />
-                                      </div>
-                                    </div>
-
-                                    <div className="overflow-y-auto max-h-60">
-                                      {(getFilteredStatesForLocation(index, locationDropdownStates[index]?.stateSearch) || []).map((state) => (
-                                        <button
-                                          key={`${location.country}-${typeof state === 'string' ? state : state.name}`}
-                                          type="button"
-                                          onClick={() => {
-                                            const stateName = typeof state === 'string' ? state : state.name;
-                                            if (stateName) {
-                                              const newLocations = [...locations];
-                                              newLocations[index].state = stateName;
-                                              setLocations(newLocations);
-                                              
-                                              // Close dropdown and clear search
-                                              const newDropdownStates = [...locationDropdownStates];
-                                              newDropdownStates[index].stateDropdownOpen = false;
-                                              newDropdownStates[index].stateSearch = '';
-                                              setLocationDropdownStates(newDropdownStates);
-                                            }
-                                          }}
-                                          className={`w-full text-left px-3 py-2 hover:bg-gray-50 ${
-                                            location.state === (typeof state === 'string' ? state : state.name) ? 'bg-purple-500/10' : ''
-                                          }`}
-                                        >
-                                          <div className="flex items-center justify-between">
-                                            <div className="font-medium">{typeof state === 'string' ? state : state.name}</div>
-                                            {location.state === (typeof state === 'string' ? state : state.name) && (
-                                              <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                                            )}
-                                          </div>
-                                        </button>
-                                      ))}
-                                      
-                                      {(getFilteredStatesForLocation(index, locationDropdownStates[index]?.stateSearch) || []).length === 0 && (
-                                        <div className="px-3 py-2 text-gray-500 text-center">
-                                          {locationDropdownStates[index]?.loadingStates ? 'Loading states...' : locationDropdownStates[index]?.statesForCountry.length === 0 ? 'No states found for this country' : 'No results match your search'}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        {/* LGA Field - Searchable Dropdown */}
-                        <div className="relative">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            LGA (Local Government Area) - Optional
-                          </label>
-                          
-                          {!location.state ? (
-                            <div className="p-4 bg-gray-50 rounded-lg text-gray-500 text-center">
-                              Please select a state first
-                            </div>
-                          ) : (
-                            <>
-                              <div className="space-y-3">
-                                {/* Searchable dropdown for LGA */}
-                                <div className="relative">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      // Load LGAs for this location if not already loaded
-                                      if (!locationDropdownStates[index]?.lgasForState.length) {
-                                        loadLgasForLocation(index, location.country, location.state);
-                                      }
-                                      
-                                      const newDropdownStates = [...locationDropdownStates];
-                                      newDropdownStates[index].lgaDropdownOpen = !newDropdownStates[index].lgaDropdownOpen;
-                                      newDropdownStates[index].countryDropdownOpen = false;
-                                      newDropdownStates[index].stateDropdownOpen = false;
-                                      newDropdownStates[index].cityDropdownOpen = false;
-                                      setLocationDropdownStates(newDropdownStates);
-                                    }}
-                                    className={`w-full flex items-center justify-between p-3 border rounded-lg hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 ${location.lga ? '' : 'text-gray-500'}`}
-                                  >
-                                    <div className="flex items-center gap-3">
-                                      <MapPin className="w-5 h-5 text-gray-400" />
-                                      {location.lga ? (
-                                        <span>{location.lga}</span>
-                                      ) : (
-                                        <span className="text-gray-500">Select LGA...</span>
-                                      )}
-                                    </div>
-                                    <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${locationDropdownStates[index]?.lgaDropdownOpen ? 'transform rotate-180' : ''}`} />
-                                  </button>
-                                  
-                                  {locationDropdownStates[index]?.lgaDropdownOpen && (
-                                    <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-80 overflow-hidden">
-                                      <div className="p-2 border-b">
-                                        <div className="relative">
-                                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                                          <input
-                                            type="text"
-                                            placeholder="Search LGAs..."
-                                            className="w-full pl-9 pr-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
-                                            value={locationDropdownStates[index]?.lgaSearch || ''}
-                                            onChange={(e) => {
-                                              const newDropdownStates = [...locationDropdownStates];
-                                              newDropdownStates[index].lgaSearch = e.target.value;
-                                              setLocationDropdownStates(newDropdownStates);
-                                            }}
-                                          />
-                                        </div>
-                                      </div>
-
-                                      <div className="overflow-y-auto max-h-60">
-                                        {(getFilteredLgasForLocation(index, locationDropdownStates[index]?.lgaSearch) || []).map((lga) => (
-                                          <button
-                                            key={`${location.state}-${typeof lga === 'string' ? lga : lga.name}`}
-                                            type="button"
-                                            onClick={() => {
-                                              const lgaName = typeof lga === 'string' ? lga : lga.name;
-                                              if (lgaName) {
-                                                const newLocations = [...locations];
-                                                newLocations[index].lga = lgaName;
-                                                setLocations(newLocations);
-                                                
-                                                // Close dropdown and clear search
-                                                const newDropdownStates = [...locationDropdownStates];
-                                                newDropdownStates[index].lgaDropdownOpen = false;
-                                                newDropdownStates[index].lgaSearch = '';
-                                                setLocationDropdownStates(newDropdownStates);
-                                              }
-                                            }}
-                                            className={`w-full text-left px-3 py-2 hover:bg-gray-50 ${
-                                              location.lga === (typeof lga === 'string' ? lga : lga.name) ? 'bg-purple-500/10' : ''
-                                            }`}
-                                          >
-                                            <div className="flex items-center justify-between">
-                                              <div className="font-medium">{typeof lga === 'string' ? lga : lga.name}</div>
-                                              {location.lga === (typeof lga === 'string' ? lga : lga.name) && (
-                                                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                                              )}
-                                            </div>
-                                          </button>
-                                        ))}
-                                        
-                                        {(getFilteredLgasForLocation(index, locationDropdownStates[index]?.lgaSearch) || []).length === 0 && (
-                                          <div className="px-3 py-2 text-gray-500 text-center">
-                                            {locationDropdownStates[index]?.loadingLgas ? 'Loading LGAs...' : locationDropdownStates[index]?.lgasForState.length === 0 ? 'No LGAs found for this state' : 'No results match your search'}
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                                <p className="text-sm text-gray-500 mt-2">
-                                  This field is optional. Select LGA if it exists for this location.
-                                </p>
-
-
-                              </div>
-                            </>
-                          )}
-                        </div>
-                        
-                        {/* City Field - Searchable Dropdown */}
-                        <div className="relative">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            City <span className="text-red-500">*</span>
-                          </label>
-                          
-                          {!location.state ? (
-                            <div className="p-4 bg-gray-50 rounded-lg text-gray-500 text-center">
-                              Please select a state first
-                            </div>
-                          ) : (
-                            <>
-                              <div className="relative">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    // Load cities for this location if not already loaded
-                                    if (!locationDropdownStates[index]?.citiesForLga.length) {
-                                      loadCitiesForLocation(index, location.country, location.state, location.lga);
-                                    }
-                                    
-                                    const newDropdownStates = [...locationDropdownStates];
-                                    newDropdownStates[index].cityDropdownOpen = !newDropdownStates[index].cityDropdownOpen;
-                                    newDropdownStates[index].countryDropdownOpen = false;
-                                    newDropdownStates[index].stateDropdownOpen = false;
-                                    setLocationDropdownStates(newDropdownStates);
-                                  }}
-                                  className={`w-full flex items-center justify-between p-3 border rounded-lg hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 ${location.city ? '' : 'text-gray-500'}`}
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <Building className="w-5 h-5 text-gray-400" />
-                                    {location.city ? (
-                                      <span>{location.city}</span>
-                                    ) : (
-                                      <span className="text-gray-500">Select city...</span>
-                                    )}
-                                  </div>
-                                  <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${locationDropdownStates[index]?.cityDropdownOpen ? 'transform rotate-180' : ''}`} />
-                                </button>
-                                
-                                {locationDropdownStates[index]?.cityDropdownOpen && (
-                                  <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-80 overflow-hidden">
-                                    <div className="p-2 border-b">
-                                      <div className="relative">
-                                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                                        <input
-                                          type="text"
-                                          placeholder="Search cities..."
-                                          className="w-full pl-9 pr-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
-                                          value={locationDropdownStates[index]?.citySearch || ''}
-                                          onChange={(e) => {
-                                            const newDropdownStates = [...locationDropdownStates];
-                                            newDropdownStates[index].citySearch = e.target.value;
-                                            setLocationDropdownStates(newDropdownStates);
-                                          }}
-                                        />
-                                      </div>
-                                    </div>
-
-                                    <div className="overflow-y-auto max-h-60">
-                                      {(getFilteredCitiesForLocation(index, locationDropdownStates[index]?.citySearch) || []).map((city) => (
-                                        <button
-                                          key={`${location.state}-${typeof city === 'string' ? city : city.name}`}
-                                          type="button"
-                                          onClick={() => {
-                                            const cityName = typeof city === 'string' ? city : city.name;
-                                            if (cityName) {
-                                              const newLocations = [...locations];
-                                              newLocations[index].city = cityName;
-                                              setLocations(newLocations);
-                                              
-                                              // Close dropdown and clear search
-                                              const newDropdownStates = [...locationDropdownStates];
-                                              newDropdownStates[index].cityDropdownOpen = false;
-                                              newDropdownStates[index].citySearch = '';
-                                              setLocationDropdownStates(newDropdownStates);
-                                            }
-                                          }}
-                                          className={`w-full text-left px-3 py-2 hover:bg-gray-50 ${
-                                            location.city === (typeof city === 'string' ? city : city.name) ? 'bg-purple-500/10' : ''
-                                          }`}
-                                        >
-                                          <div className="flex items-center justify-between">
-                                            <div className="font-medium">{typeof city === 'string' ? city : city.name}</div>
-                                            {location.city === (typeof city === 'string' ? city : city.name) && (
-                                              <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                                            )}
-                                          </div>
-                                        </button>
-                                      ))}
-                                      
-                                      {(getFilteredCitiesForLocation(index, locationDropdownStates[index]?.citySearch) || []).length === 0 && (
-                                        <div className="px-3 py-2 text-gray-500 text-center">
-                                          {locationDropdownStates[index]?.loadingCities ? 'Loading cities...' : locationDropdownStates[index]?.citiesForLga.length === 0 ? 'No cities found for this LGA' : 'No results match your search'}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        {/* City Region Field - Searchable Dropdown */}
-                        <div className="relative">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            City Region with Fee - Optional
-                          </label>
-                          
-                          {!location.city ? (
-                            <div className="p-4 bg-gray-50 rounded-lg text-gray-500 text-center">
-                              Please select a city first
-                            </div>
-                          ) : (
-                            <>
-                              <div className="space-y-3">
-                                {/* Searchable dropdown for city region */}
-                                <div>
-                                  <div className="relative">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        // Load city regions for this location if not already loaded
-                                        if (!locationDropdownStates[index]?.cityRegionsForCity.length) {
-                                          loadCityRegionsForLocation(index, location.country, location.state, location.lga, location.city);
-                                        }
-                                        
-                                        const newDropdownStates = [...locationDropdownStates];
-                                        newDropdownStates[index].cityRegionDropdownOpen = !newDropdownStates[index].cityRegionDropdownOpen;
-                                        newDropdownStates[index].countryDropdownOpen = false;
-                                        newDropdownStates[index].stateDropdownOpen = false;
-                                        newDropdownStates[index].lgaDropdownOpen = false;
-                                        newDropdownStates[index].cityDropdownOpen = false;
-                                        setLocationDropdownStates(newDropdownStates);
-                                      }}
-                                      className={`w-full flex items-center justify-between p-3 border rounded-lg hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 ${location.cityRegion ? '' : 'text-gray-500'}`}
-                                    >
-                                      <div className="flex items-center gap-3">
-                                        <Layers className="w-5 h-5 text-gray-400" />
-                                        {location.cityRegion ? (
-                                          <span>{location.cityRegion} {location.cityRegionFee ? `(₦${location.cityRegionFee.toLocaleString()})` : ''}</span>
-                                        ) : (
-                                          <span className="text-gray-500">Select city region...</span>
-                                        )}
-                                      </div>
-                                      <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${locationDropdownStates[index]?.cityRegionDropdownOpen ? 'transform rotate-180' : ''}`} />
-                                    </button>
-                                    
-                                    {locationDropdownStates[index]?.cityRegionDropdownOpen && (
-                                      <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-80 overflow-hidden">
-                                        <div className="p-2 border-b">
-                                          <div className="relative">
-                                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                                            <input
-                                              type="text"
-                                              placeholder="Search city regions..."
-                                              className="w-full pl-9 pr-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
-                                              value={locationDropdownStates[index]?.cityRegionSearch || ''}
-                                              onChange={(e) => {
-                                                const newDropdownStates = [...locationDropdownStates];
-                                                newDropdownStates[index].cityRegionSearch = e.target.value;
-                                                setLocationDropdownStates(newDropdownStates);
-                                              }}
-                                            />
-                                          </div>
-                                        </div>
-                                      
-                                        <div className="overflow-y-auto max-h-60">
-                                          {(getFilteredCityRegionsForLocation(index, locationDropdownStates[index]?.cityRegionSearch) || []).map((region) => (
-                                            <button
-                                              key={region._id}
-                                              type="button"
-                                              onClick={() => {
-                                                const newLocations = [...locations];
-                                                newLocations[index].cityRegion = region.name;
-                                                newLocations[index].cityRegionFee = region.fee;
-                                                setLocations(newLocations);
-                                                
-                                                // Close dropdown and clear search
-                                                const newDropdownStates = [...locationDropdownStates];
-                                                newDropdownStates[index].cityRegionDropdownOpen = false;
-                                                newDropdownStates[index].cityRegionSearch = '';
-                                                setLocationDropdownStates(newDropdownStates);
-                                              }}
-                                              className={`w-full text-left px-3 py-2 hover:bg-gray-50 ${
-                                                location.cityRegion === region.name ? 'bg-purple-500/10' : ''
-                                              }`}
-                                            >
-                                              <div className="flex items-center justify-between">
-                                                <div className="font-medium">{region.name} (₦{region.fee.toLocaleString()})</div>
-                                                {location.cityRegion === region.name && (
-                                                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                                                )}
-                                              </div>
-                                            </button>
-                                          ))}
-                                          
-                                          {(getFilteredCityRegionsForLocation(index, locationDropdownStates[index]?.cityRegionSearch) || []).length === 0 && (
-                                            <div className="px-3 py-2 text-gray-500 text-center">
-                                              {locationDropdownStates[index]?.loadingCityRegions ? 'Loading city regions...' : locationDropdownStates[index]?.cityRegionsForCity.length === 0 ? 'No city regions found for this city' : 'No results match your search'}
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                  
-                                  <p className="text-sm text-gray-500 mt-2">
-                                    {locationDropdownStates[index]?.loadingCityRegions ? 'Loading city regions...' : 'This field is optional. Select or enter region within the city.'}
-                                  </p>
-                                </div>
-
-
-                              </div>
-                            </>
-                          )}
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">House Number</label>
-                          <input
-                            type="text"
-                            value={location.houseNumber}
-                            onChange={(e) => {
-                              const newLocations = [...locations];
-                              newLocations[index].houseNumber = e.target.value;
-                              setLocations(newLocations);
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                            placeholder="House Number"
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="mb-6">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Street</label>
-                        <input
-                          type="text"
-                          value={location.street}
-                          onChange={(e) => {
-                            const newLocations = [...locations];
-                            newLocations[index].street = e.target.value;
-                            setLocations(newLocations);
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                          placeholder="Street Address"
-                        />
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Landmark</label>
-                          <input
-                            type="text"
-                            value={location.landmark || ''}
-                            onChange={(e) => {
-                              const newLocations = [...locations];
-                              newLocations[index].landmark = e.target.value || undefined;
-                              setLocations(newLocations);
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                            placeholder="Nearby landmark or bus stop"
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Building Color</label>
-                          <input
-                            type="text"
-                            value={location.buildingColor || ''}
-                            onChange={(e) => {
-                              const newLocations = [...locations];
-                              newLocations[index].buildingColor = e.target.value || undefined;
-                              setLocations(newLocations);
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                            placeholder="Building color"
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Building Type</label>
-                          <input
-                            type="text"
-                            value={location.buildingType || ''}
-                            onChange={(e) => {
-                              const newLocations = [...locations];
-                              newLocations[index].buildingType = e.target.value || undefined;
-                              setLocations(newLocations);
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                            placeholder="Type of building"
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">City Region Fee</label>
-                          <input
-                            type="number"
-                            value={location.cityRegionFee || ''}
-                            onChange={(e) => {
-                              const newLocations = [...locations];
-                              newLocations[index].cityRegionFee = e.target.value ? Number(e.target.value) : undefined;
-                              setLocations(newLocations);
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                            placeholder="Delivery/service fee for region"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  
-                  <button
-                    onClick={() => {
-                      // Add new location
-                      setLocations([...locations, {
-                        locationType: 'branch',
-                        brandName: '',
-                        country: '',
-                        state: '',
-                        lga: '',
-                        city: '',
-                        cityRegion: '',
-                        houseNumber: '',
-                        street: '',
-                        landmark: undefined, // Make optional fields undefined instead of empty strings
-                        buildingColor: undefined,
-                        buildingType: undefined,
-                        cityRegionFee: undefined,
-                        gallery: {
-                          images: [],
-                          videos: []
-                        }
-                      } as LocationData]);
-                      
-                      // Add corresponding dropdown state
-                      setLocationDropdownStates([...locationDropdownStates, {
-                        countryDropdownOpen: false,
-                        stateDropdownOpen: false,
-                        lgaDropdownOpen: false,
-                        cityDropdownOpen: false,
-                        cityRegionDropdownOpen: false,
-                        // Search states
-                        countrySearch: '',
-                        stateSearch: '',
-                        lgaSearch: '',
-                        citySearch: '',
-                        cityRegionSearch: '',
-                        // Manual input states
-                        showManualCountry: false,
-                        manualCountry: '',
-                        showManualState: false,
-                        manualState: '',
-                        showManualLGA: false,
-                        manualLGA: '',
-                        showManualCity: false,
-                        manualCity: '',
-                        showManualRegion: false,
-                        manualRegion: '',
-                        // Loading states
-                        loadingStates: false,
-                        loadingLgas: false,
-                        loadingCities: false,
-                        loadingCityRegions: false,
-                        // Filtered options
-                        statesForCountry: [],
-                        lgasForState: [],
-                        citiesForLga: [],
-                        cityRegionsForCity: [],
-                      } as DropdownState]);
-                    }}
-                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 flex items-center"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Another Location
-                  </button>
-                </div>
-                
-                <div className="mt-8 flex justify-between">
-                  <button
-                    onClick={() => setCurrentStep('profile')}
-                    className="px-6 py-3 rounded-lg font-semibold text-gray-700 bg-gray-200 hover:bg-gray-300"
-                  >
-                    Back to Profile
-                  </button>
-                  <button
-                    onClick={async () => {
-                      setLocationSubmitting(true);
-                      setLocationError(null);
-                      
-                      try {
-                        // Check if unverified organization is trying to add more than one location
-                        if (organizationProfile.verificationStatus === 'unverified' && locations.length > 1) {
-                          setLocationError('Unverified organizations can only add one location (headquarters). Please subscribe to verified badge to add more locations.');
-                          setLocationSubmitting(false);
-                          return;
-                        }
-                        
-                        // Check if the only location is headquarters for unverified organizations
-                        if (organizationProfile.verificationStatus === 'unverified' && locations.length === 1) {
-                          const headquartersLocation = locations.find(loc => loc.locationType === 'headquarters');
-                          if (!headquartersLocation) {
-                            setLocationError('Unverified organizations must have exactly one headquarters location.');
-                            setLocationSubmitting(false);
-                            return;
-                          }
-                        }
-                        
-                        // Save locations to organization profile
-                        const orgProfileService = new OrganizationProfileService();
-                        
-                        // Send locations as-is since all required fields are present
-                        // Only apply filtering for unverified organizations
-                        let locationsToSend = locations;
-                        if (organizationProfile.verificationStatus === 'unverified') {
-                          // Even if there are multiple locations in the form, only send the first one
-                          if (locations.length > 0) {
-                            // Take the first location and ensure it's headquarters
-                            const firstLocation = {...locations[0]};
-                            firstLocation.locationType = 'headquarters';
-                            locationsToSend = [firstLocation];
-                          }
-                        }
-                        
-                        console.log('🚀 Organization verification status:', organizationProfile.verificationStatus);
-                        console.log('🚀 Total locations in form:', locations.length);
-                        console.log('🚀 Locations being sent to backend:', locationsToSend);
-                        
-                        const profileResponse = await orgProfileService.addLocation(locationsToSend);
-                        
-                        console.log('🚀 Backend response:', profileResponse);
-                        
-                        if (profileResponse.success) {
-                          setLocationSuccess(true);
-                          setTimeout(() => {
-                            // For verified organizations, go to location payment
-                            // For unverified organizations, go to regular package payment
-                            if (organizationProfile.verificationStatus === 'verified') {
-                              setCurrentStep('location-payment');
-                            } else {
-                              setCurrentStep('payment');
-                            }
-                          }, 1500);
-                        } else {
-                          setLocationError(profileResponse.message || 'Failed to save locations');
-                        }
-                      } catch (error: any) {
-                        console.error('🚨 Error saving locations:', error);
-                        setLocationError(error.message || 'An error occurred while saving locations');
-                        
-                        // Handle 500 server errors specifically
-                        if (error.message && error.message.includes('500')) {
-                          setLocationError('Server error occurred. Please try again or contact support.');
-                        }
-                      } finally {
-                        setLocationSubmitting(false);
-                      }
-                    }}
-                    disabled={locationSubmitting}
-                    className={`px-6 py-3 rounded-lg font-semibold text-white ${locationSubmitting ? 'bg-gray-400' : 'bg-purple-600 hover:bg-purple-700'}`}
-                  >
-                    {locationSubmitting ? 'Saving...' : 
-                     organizationProfile.verificationStatus === 'verified' ? 'Continue to Location Payment' : 'Continue to Package Payment'
-                    }
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
 
         {/* Payment Section - Step 4 */}
         {currentStep === 'payment' && Object.keys(selectedPackages).length > 0 && (
           <>
+            {/* Payment Summary Banner */}
+            <div className="mb-8 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl p-6 text-white">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold mb-2">Payment Summary</h2>
+                <p className="text-purple-100 mb-4">Review your order before completing payment</p>
+                
+                {/* Quick Summary */}
+                <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                    <div>
+                      <p className="text-sm text-purple-100">Package(s)</p>
+                      <p className="text-lg font-semibold">{Object.keys(selectedPackages).length}</p>
+                    </div>
+                    {organizationProfile.isPublicProfile && locations.length > 0 && (
+                      <div>
+                        <p className="text-sm text-purple-100">Location(s)</p>
+                        <p className="text-lg font-semibold">{locations.length}</p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-sm text-purple-100">Total Amount</p>
+                      <p className="text-2xl font-bold">₦{Math.round(totalAmount).toLocaleString('en-NG')}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
             {/* Card Summary Section */}
             <div className="mb-8 bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
               <div className="flex items-center justify-between mb-6">
@@ -1981,19 +1391,41 @@ const SubscriptionPage: React.FC = () => {
                     if (!pkg) return null;
                     
                     const userCount = packageUserCounts[packageId] || pkg.maxUsers || 1;
-                    const price = getBillingPrice(pkg, billingCycle);
+                    
+                    // CRITICAL: Get the correct amount for the selected billing cycle
+                    const cycleServices = pkg.services.filter(service => service.duration === billingCycle);
+                    const actualPrice = cycleServices.reduce((sum, service) => sum + (service.price || 0), 0);
+                    
+                    console.log(`📦 Payment summary - ${pkg.packageName} (${billingCycle}): ₦${actualPrice.toLocaleString()}`);
                     
                     return (
-                      <div key={packageId} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                        <div>
-                          <h5 className="font-medium text-gray-900">{pkg.packageName}</h5>
-                          <p className="text-sm text-gray-600">{billingCycle.charAt(0).toUpperCase() + billingCycle.slice(1)} Plan</p>
-                          <p className="text-sm text-gray-600">{userCount} user{userCount > 1 ? 's' : ''}</p>
+                      <div key={packageId} className="p-4 bg-gray-50 rounded-lg">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <h5 className="font-medium text-gray-900">{pkg.packageName}</h5>
+                            <p className="text-sm text-gray-600 capitalize font-medium">{billingCycle} Plan</p>
+                            <p className="text-sm text-gray-600">{userCount} user{userCount > 1 ? 's' : ''}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xl font-bold text-gray-900">₦{Math.round(actualPrice).toLocaleString('en-NG')}</p>
+                            <p className="text-xs text-gray-500">Amount for {billingCycle} plan</p>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-gray-900">₦{Math.round(price).toLocaleString('en-NG')}</p>
-                          <p className="text-sm text-gray-500">{billingCycle}</p>
-                        </div>
+                        
+                        {/* Services included in this plan */}
+                        {cycleServices.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-gray-200">
+                            <p className="text-xs text-gray-500 mb-2">Services included:</p>
+                            <div className="space-y-1">
+                              {cycleServices.map((service: Service, idx: number) => (
+                                <div key={idx} className="flex justify-between text-xs text-gray-600">
+                                  <span>• {service.name}</span>
+                                  <span>₦{service.price.toLocaleString('en-NG')}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -2022,36 +1454,104 @@ const SubscriptionPage: React.FC = () => {
               </div>
               
               {/* Locations Summary (if public profile) */}
-              {organizationProfile.isPublicProfile && (
+              {organizationProfile.isPublicProfile && locations.length > 0 && (
                 <div className="mb-6">
-                  <h4 className="font-medium text-gray-900 mb-3">Locations</h4>
+                  <h4 className="font-medium text-gray-900 mb-3">Location Verification Fees</h4>
                   <div className="space-y-2">
                     {locations.map((location, index) => (
-                      <div key={index} className="flex items-center p-3 bg-gray-50 rounded-lg">
-                        <MapPin className="w-4 h-4 text-gray-400 mr-2" />
-                        <div>
-                          <p className="font-medium text-gray-900">{location.brandName || `Location ${index + 1}`}</p>
-                          <p className="text-sm text-gray-600">
-                            {location.city}, {location.state}, {location.country}
-                          </p>
+                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center">
+                          <MapPin className="w-4 h-4 text-gray-400 mr-2" />
+                          <div>
+                            <p className="font-medium text-gray-900">{location.brandName || `Location ${index + 1}`}</p>
+                            <p className="text-sm text-gray-600">
+                              {location.city}, {location.state}, {location.country}
+                            </p>
+                            {location.pricingSource && (
+                              <p className="text-xs text-gray-500">{location.pricingSource}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          {location.cityRegionFee ? (
+                            <p className="font-semibold text-gray-900">₦{location.cityRegionFee.toLocaleString('en-NG')}</p>
+                          ) : (
+                            <p className="text-sm text-gray-500">Fee pending</p>
+                          )}
                         </div>
                       </div>
                     ))}
+                  </div>
+                  
+                  {/* Location Total */}
+                  <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium text-blue-900">Location Verification Total:</span>
+                      <span className="font-bold text-blue-900">
+                        ₦{locations.reduce((total, loc) => total + (loc.cityRegionFee || 0), 0).toLocaleString('en-NG')}
+                      </span>
+                    </div>
                   </div>
                 </div>
               )}
               
               {/* Total Summary */}
               <div className="border-t border-gray-200 pt-4">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-lg font-semibold text-gray-900">Total Amount</p>
-                    <p className="text-sm text-gray-500">{Object.keys(selectedPackages).length} package(s)</p>
+                {/* Show breakdown if we have both package and location costs */}
+                {organizationProfile.isPublicProfile && locations.length > 0 && locations.some(loc => loc.cityRegionFee) ? (
+                  <div className="space-y-3">
+                    {/* Package Subtotal */}
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-medium text-gray-700">Package Subscription</p>
+                        <p className="text-sm text-gray-500">{Object.keys(selectedPackages).length} package(s)</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-gray-900">
+                          ₦{Math.round(totalAmount - locations.reduce((total, loc) => total + (loc.cityRegionFee || 0), 0)).toLocaleString('en-NG')}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Location Subtotal */}
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-medium text-gray-700">Location Verification</p>
+                        <p className="text-sm text-gray-500">{locations.length} location(s)</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-gray-900">
+                          ₦{locations.reduce((total, loc) => total + (loc.cityRegionFee || 0), 0).toLocaleString('en-NG')}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Combined Total */}
+                    <div className="border-t border-gray-200 pt-3">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="text-xl font-bold text-gray-900">Total Amount</p>
+                          <p className="text-sm text-gray-500">Package + Location Verification</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-3xl font-bold text-purple-600">₦{Math.round(totalAmount).toLocaleString('en-NG')}</p>
+                          <p className="text-sm text-green-600">Combined Payment</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-purple-600">₦{Math.round(totalAmount).toLocaleString('en-NG')}</p>
+                ) : (
+                  /* Simple total for package-only payments */
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-lg font-semibold text-gray-900">Total Amount</p>
+                      <p className="text-sm text-gray-500">{Object.keys(selectedPackages).length} package(s)</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-purple-600">₦{Math.round(totalAmount).toLocaleString('en-NG')}</p>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
             
@@ -2103,7 +1603,10 @@ const SubscriptionPage: React.FC = () => {
                   ) : (
                     <>
                       <CreditCard className="w-5 h-5 mr-2" />
-                      Pay ₦{Math.round(totalAmount).toLocaleString('en-NG')}
+                      {organizationProfile.isPublicProfile && locations.length > 0 && locations.some(loc => loc.cityRegionFee) 
+                        ? `Pay Combined ₦${Math.round(totalAmount).toLocaleString('en-NG')} (Package + Locations)`
+                        : `Pay ₦${Math.round(totalAmount).toLocaleString('en-NG')} (Package Only)`
+                      }
                     </>
                   )}
                 </button>

@@ -33,6 +33,7 @@ interface InitializePaymentRequest {
 }
 
 interface InitializePaymentResponse {
+  message: string;
   success: boolean;
   data: {
     paymentLink: string;
@@ -192,4 +193,27 @@ export type {
   VerifyPaymentResponse,
   PaymentHistoryResponse,
   PaymentStatusResponse
+};
+
+
+// Add these to your existing apiRoutes.ts file
+
+export const routes = {
+  // ... other existing routes
+  
+  // Location Verification Routes
+  getRejectedLocationVerifications: () => ({
+    url: '/super-admin/location-verifications/rejected',
+    method: 'GET' as const,
+  }),
+
+  getVerifiedLocationVerifications: () => ({
+    url: '/super-admin/location-verifications/verified',
+    method: 'GET' as const,
+  }),
+
+  sendRejectionEmail: (profileId: string, locationIndex: number) => ({
+    url: `/super-admin/location-verifications/${profileId}/${locationIndex}/send-rejection-email`,
+    method: 'POST' as const,
+  }),
 };

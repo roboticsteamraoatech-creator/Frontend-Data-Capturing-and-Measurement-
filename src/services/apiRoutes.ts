@@ -110,6 +110,11 @@ deleteService: (id: string) => `/api/services/${id}`,
     exportCustomers: (format: 'csv' | 'excel' | 'pdf') => `/api/super-admin/customers/export/${format}`,
   },
 
+
+  
+
+
+
   // Module management routes
   getModules: (search?: string, status?: 'active' | 'inactive') => {
     let url = '/api/super-admin/modules';
@@ -153,5 +158,23 @@ deleteService: (id: string) => `/api/services/${id}`,
   updateCityRegionStatus: (id: string) => `/api/super-admin/locations/${id}`,
   exportCityRegions: (format: 'csv' | 'excel' | 'pdf') => `/api/super-admin/locations/export/${format}`,
   
-  scanMeasurements: () => '/api/measurements/scan'
+  scanMeasurements: () => '/api/measurements/scan',
+  
+  
+    getDefaultPricing: (page?: number, limit?: number, country?: string, state?: string) => {
+    let url = '/api/super-admin/default-pricing';
+    const params = new URLSearchParams();
+    if (page) params.append('page', page.toString());
+    if (limit) params.append('limit', limit.toString());
+    if (country) params.append('country', country);
+    if (state) params.append('state', state);
+    const paramString = params.toString();
+    return paramString ? `${url}?${paramString}` : url;
+  },
+  getDefaultPricingById: (id: string) => `/api/super-admin/default-pricing/${id}`,
+  createDefaultPricing: () => '/api/super-admin/default-pricing',
+  updateDefaultPricing: (id: string) => `/api/super-admin/default-pricing/${id}`,
+  deleteDefaultPricing: (id: string) => `/api/super-admin/default-pricing/${id}`,
+
+
 };

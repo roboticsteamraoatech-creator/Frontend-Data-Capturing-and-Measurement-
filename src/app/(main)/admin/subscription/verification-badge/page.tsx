@@ -563,13 +563,6 @@ const VerificationBadgeSubscriptionPage: React.FC = () => {
   };
 
   
-
-  
-
-  
-
-  
-
   
   const handleStateChange = async (countryName: string) => {
     setLoadingStates(true);
@@ -938,67 +931,94 @@ const VerificationBadgeSubscriptionPage: React.FC = () => {
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Building Type</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Business Type</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Public Profile</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Verification Status</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Paid For</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location Verification</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gallery Images</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gallery Videos</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {locations.length > 0 ? (
-                    locations.map((location, index) => (
-                      <tr key={index}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${location.locationType === 'headquarters' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
-                            {location.locationType.charAt(0).toUpperCase() + location.locationType.slice(1)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{location.brandName}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{location.country}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{location.state}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{location.lga}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{location.city}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{location.cityRegion}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {location.houseNumber} {location.street}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {location.landmark || 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {location.buildingType || 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {organizationDetails.type}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {organizationDetails.visibility === 'public' ? 'Yes' : 'No'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {organizationDetails.verifiedBadge ? 'Verified' : 'Unverified'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex space-x-4">
-                          <button
-                            onClick={() => handleEditLocation(index)}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteLocation(index)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={14} className="px-6 py-4 text-center text-sm text-gray-500">
-                        No locations added yet. Click "Add New Location" to get started.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
+  {locations.length > 0 ? (
+    locations.map((location, index) => {
+      // Extract the actual location data from _doc if it exists
+      const locData = location._doc ? location._doc : location;
+      
+      return (
+        <tr key={index}>
+          <td className="px-6 py-4 whitespace-nowrap">
+            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${locData.locationType === 'headquarters' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
+              {locData.locationType ? locData.locationType.charAt(0).toUpperCase() + locData.locationType.slice(1) : 'Unknown'}
+            </span>
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{locData.brandName || 'N/A'}</td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{locData.country || 'N/A'}</td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{locData.state || 'N/A'}</td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{locData.lga || 'N/A'}</td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{locData.city || 'N/A'}</td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{locData.cityRegion || 'N/A'}</td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            {locData.houseNumber || 'N/A'} {locData.street || 'N/A'}
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            {locData.landmark || 'N/A'}
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            {locData.buildingType || 'N/A'}
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            {profileInfo?.businessType || 'N/A'}
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            {profileInfo?.isPublicProfile ? 'Yes' : 'No'}
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            {locData.isPaidFor ? (
+              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                Yes
+              </span>
+            ) : (
+              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                No
+              </span>
+            )}
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${locData.verificationStatus === 'verified' ? 'bg-green-100 text-green-800' : locData.verificationStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
+              {locData.verificationStatus?.charAt(0).toUpperCase() + locData.verificationStatus?.slice(1) || 'N/A'}
+            </span>
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            {locData.gallery?.images?.length || 0} images
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            {locData.gallery?.videos?.length || 0} videos
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex space-x-4">
+            <button
+              onClick={() => handleEditLocation(index)}
+              className="text-blue-600 hover:text-blue-800"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => handleDeleteLocation(index)}
+              className="text-red-600 hover:text-red-900"
+            >
+              Delete
+            </button>
+          </td>
+        </tr>
+      );
+    })
+  ) : (
+    <tr>
+      <td colSpan={17} className="px-6 py-4 text-center text-sm text-gray-500">
+        No locations added yet. Click "Add New Location" to get started.
+      </td>
+    </tr>
+  )}
+</tbody>
               </table>
             </div>
           </div>
